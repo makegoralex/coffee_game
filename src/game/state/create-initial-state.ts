@@ -13,14 +13,27 @@ export function createInitialState(): GameState {
     },
     cafe: {
       stations: [],
-      activeCustomers: [],
       unlockedZoneIds: ['starter_zone'],
       averageCheck: 12,
-      customerFlowPerMinute: 6,
+      customerFlowPerMinute: 18,
       equipmentLevel: 1,
       manualSaleIncome: 5,
-      passiveIncomePerSecond: 1,
+      passiveIncomePerSecond: 0,
       equipmentUpgradeBaseCost: 50,
+      nextVisitorInSec: 1.5,
+      spawnRemainder: 0,
+
+      queueCustomers: [],
+      activeOrder: null,
+      pickupQueueCustomerIds: [],
+      readyOrders: [],
+
+      rating: 80,
+      serviceStats: {
+        servedCustomers: 0,
+        lostCustomers: 0,
+        wrongOrders: 0,
+      },
     },
     meta: {
       prestigeLevel: 0,
