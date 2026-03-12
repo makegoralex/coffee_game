@@ -67,15 +67,23 @@ export interface Order {
 }
 
 export interface ServiceState {
-  customerQueue: {
+  // legacy queue-style shape
+  customerQueue?: {
     customerIds: string[];
     maxSize: number;
   };
-  orderQueue: string[];
-  readyOrderIds: string[];
-  brewingOrderId: string | null;
-  activeCustomers: CustomerState[];
-  activeOrders: Order[];
+  orderQueue?: string[];
+  readyOrderIds?: string[];
+  brewingOrderId?: string | null;
+  activeCustomers?: CustomerState[];
+  activeOrders?: Order[];
+
+  // legacy station-style shape
+  stationId?: string;
+  queuedOrderIds?: string[];
+  maxQueueSize?: number;
+  processingTimeSec?: number;
+  activeTask?: string | null;
 }
 
 export interface CafeState {
