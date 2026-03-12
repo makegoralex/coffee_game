@@ -24,13 +24,19 @@ export interface CustomerState {
   patienceSec: number;
   orderValue: number;
   waitedSec: number;
+  status: CustomerStatus;
 }
+
+export type CustomerStatus = 'waiting' | 'ordering' | 'brewing' | 'served' | 'left';
+
+export type OrderStatus = 'queued' | 'brewing' | 'ready' | 'served' | 'cancelled';
 
 export interface Order {
   id: string;
   customerId: string;
   value: number;
-  currentStationId: string;
+  status: OrderStatus;
+  remainingBrewSec: number;
 }
 
 export interface WorkerTask {
@@ -59,6 +65,9 @@ export interface CafeState {
   stations: StationState[];
   activeCustomers: CustomerState[];
   activeOrders: Order[];
+  orderQueue: string[];
+  brewingOrderId: string | null;
+  readyOrderIds: string[];
   customerQueue: QueueState;
   services: ServiceState[];
   unlockedZoneIds: string[];
