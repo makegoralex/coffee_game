@@ -1,27 +1,16 @@
-# Coffee Game MVP (Vite + TypeScript)
+# Coffee Game — Architecture Scaffold
 
-HTML5 idle/tycoon MVP про управление кофейней для Яндекс Игр.
+Проект-заготовка для HTML5 idle/tycoon игры «Управление своей кофейней» под Яндекс Игры.
 
-## Что уже есть
+- Подробная архитектура: `docs/architecture.md`
+- MVP и roadmap: `docs/mvp-plan.md`
+- Стартовый scaffold TypeScript + Phaser 3: `src/`
 
-- Базовый игровой экран.
-- Счётчик денег.
-- Кнопка ручной продажи кофе.
-- Пассивный доход в realtime.
-- Первое улучшение оборудования (рост ручного и пассивного дохода).
-- Сохранение/загрузка прогресса из `localStorage`.
-- Адаптация под мобильный экран.
-
-## Команды
+## Quick start
 
 ```bash
 npm install
-npm run dev
-npm run build
-npm run preview
+npm run typecheck
 ```
 
-## Документация
-
-- Архитектура: `docs/architecture.md`
-- MVP roadmap: `docs/mvp-plan.md`
+На этом этапе добавлен именно архитектурный каркас и контракты слоёв, без полной реализации игровых экранов.

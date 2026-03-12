@@ -1,16 +1,21 @@
-name: Deploy
+name: Deploy Coffee Game
 
 on:
   push:
-    branches: [main, work]
+    branches:
+      - main
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          node-version: 20
-      - run: npm ci
-      - run: npm run build
+          host: 194.58.114.91
+          username: root
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /var/www/coffee-game
+            bash deploy.sh
