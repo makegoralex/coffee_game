@@ -25,41 +25,7 @@ export interface WaitingCustomer {
   recipeId: RecipeId;
   patienceSec: number;
   waitedSec: number;
-  status: CustomerStatus;
-}
-
-export type CustomerStatus = 'waiting' | 'ordering' | 'brewing' | 'served' | 'left';
-
-export type OrderStatus = 'queued' | 'brewing' | 'ready' | 'served' | 'cancelled';
-
-export interface Order {
-  id: string;
-  customerId: string;
-  value: number;
-  status: OrderStatus;
-  remainingBrewSec: number;
-}
-
-export interface WorkerTask {
-  id: string;
-  orderId: string;
-  customerId: string;
-  stationId: string;
-  remainingSec: number;
-  totalSec: number;
-}
-
-export interface QueueState {
-  customerIds: string[];
-  maxSize: number;
-}
-
-export interface ServiceState {
-  stationId: string;
-  queuedOrderIds: string[];
-  maxQueueSize: number;
-  processingTimeSec: number;
-  activeTask: WorkerTask | null;
+  status?: 'waiting' | 'ordering' | 'brewing' | 'served' | 'left';
 }
 
 export interface ActiveOrder {
@@ -83,6 +49,21 @@ export interface ServiceStats {
   wrongOrders: number;
 }
 
+// Legacy compatibility aliases to avoid deploy-time type crashes on stale code paths.
+export type CustomerState = WaitingCustomer;
+export interface CustomerArchetype {
+  id: string;
+  patienceSec: number;
+  orderValue: number;
+}
+export interface Order {
+  id: string;
+  customerId: string;
+  recipeId: string;
+  status?: 'queued' | 'brewing' | 'ready' | 'served' | 'cancelled';
+  createdAtUtcMs?: number;
+}
+
 export interface CafeState {
   stations: StationState[];
   unlockedZoneIds: string[];
@@ -102,6 +83,14 @@ export interface CafeState {
 
   rating: number;
   serviceStats: ServiceStats;
+
+  // Legacy optional fields for backward compatibility with older game loop code.
+  activeCustomers?: CustomerState[];
+  customerQueue?: string[];
+  activeOrders?: Array<{ id: string; customerId: string; recipeId: string; progressSec?: number }>;
+  orderQueue?: string[];
+  readyOrderIds?: string[];
+  brewingOrderId?: string | null;
 }
 
 export interface MetaProgressState {
