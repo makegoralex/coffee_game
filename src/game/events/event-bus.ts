@@ -3,6 +3,10 @@ export type GameEvent =
   | { type: 'economy.moneySpent'; amount: number }
   | { type: 'coffee.sold'; amount: number }
   | { type: 'upgrade.bought'; upgradeId: string; newLevel: number }
+  | { type: 'customer.spawned'; customerId: string; archetypeId: string }
+  | { type: 'customer.lost'; customerId: string }
+  | { type: 'order.created'; orderId: string; customerId: string }
+  | { type: 'order.completed'; orderId: string; customerId: string; amount: number }
   | { type: 'monetization.rewardGranted'; rewardId: string };
 
 type Handler<T extends GameEvent> = (event: T) => void;
