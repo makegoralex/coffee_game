@@ -22,7 +22,7 @@ export type RecipeId = 'espresso' | 'americano' | 'latte';
 
 export interface WaitingCustomer {
   id: string;
-  recipeId: RecipeId;
+  recipeId?: RecipeId;
   patienceSec: number;
   waitedSec: number;
   status: 'waiting' | 'ordering' | 'brewing' | 'served' | 'left';
@@ -57,14 +57,14 @@ export interface CustomerArchetype {
   id: string;
   patienceSec: number;
   orderValue?: number;
-  valueMultiplier?: number;
+  valueMultiplier: number;
   spawnWeight?: number;
 }
 export interface Order {
   id: string;
   customerId: string;
-  recipeId: string;
-  progressSec: number;
+  recipeId?: string;
+  progressSec?: number;
   remainingBrewSec: number;
   status?: 'queued' | 'brewing' | 'ready' | 'served' | 'cancelled';
   value: number;

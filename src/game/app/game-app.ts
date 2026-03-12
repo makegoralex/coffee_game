@@ -79,14 +79,15 @@ export class GameApp {
       const customer = this.state.cafe.queueCustomers.shift();
       if (customer) {
         const orderId = crypto.randomUUID();
+        const recipeId = customer.recipeId ?? 'americano';
         this.state.cafe.activeOrder = {
           orderId,
           customerId: customer.id,
-          recipeId: customer.recipeId,
+          recipeId,
           progressSec: 0,
-          requiredSec: this.getBrewDurationSec(customer.recipeId),
+          requiredSec: this.getBrewDurationSec(recipeId),
         };
-        this.eventBus.emit({ type: 'order.created', orderId, customerId: customer.id, recipeId: customer.recipeId });
+        this.eventBus.emit({ type: 'order.created', orderId, customerId: customer.id, recipeId });
         this.eventBus.emit({ type: 'customer.leftQueue', customerId: customer.id, reason: 'served' });
       }
     }
