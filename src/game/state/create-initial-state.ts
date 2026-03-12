@@ -17,6 +17,10 @@ export function createInitialState(): GameState {
       unlockedZoneIds: ['starter_zone'],
       averageCheck: 12,
       customerFlowPerMinute: 6,
+      equipmentLevel: 1,
+      manualSaleIncome: 5,
+      passiveIncomePerSecond: 1,
+      equipmentUpgradeBaseCost: 50,
     },
     meta: {
       prestigeLevel: 0,

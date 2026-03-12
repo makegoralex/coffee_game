@@ -32,6 +32,10 @@ export interface CafeState {
   unlockedZoneIds: string[];
   averageCheck: number;
   customerFlowPerMinute: number;
+  equipmentLevel: number;
+  manualSaleIncome: number;
+  passiveIncomePerSecond: number;
+  equipmentUpgradeBaseCost: number;
 }
 
 export interface MetaProgressState {

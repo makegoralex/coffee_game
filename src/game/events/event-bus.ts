@@ -1,6 +1,8 @@
 export type GameEvent =
   | { type: 'economy.moneyEarned'; amount: number }
-  | { type: 'upgrade.bought'; upgradeId: string }
+  | { type: 'economy.moneySpent'; amount: number }
+  | { type: 'coffee.sold'; amount: number }
+  | { type: 'upgrade.bought'; upgradeId: string; newLevel: number }
   | { type: 'monetization.rewardGranted'; rewardId: string };
 
 type Handler<T extends GameEvent> = (event: T) => void;
