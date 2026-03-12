@@ -24,6 +24,41 @@ export interface CustomerState {
   patienceSec: number;
   orderValue: number;
   waitedSec: number;
+  status: CustomerStatus;
+}
+
+export type CustomerStatus = 'waiting' | 'ordering' | 'brewing' | 'served' | 'left';
+
+export type OrderStatus = 'queued' | 'brewing' | 'ready' | 'served' | 'cancelled';
+
+export interface Order {
+  id: string;
+  customerId: string;
+  value: number;
+  status: OrderStatus;
+  remainingBrewSec: number;
+}
+
+export interface WorkerTask {
+  id: string;
+  orderId: string;
+  customerId: string;
+  stationId: string;
+  remainingSec: number;
+  totalSec: number;
+}
+
+export interface QueueState {
+  customerIds: string[];
+  maxSize: number;
+}
+
+export interface ServiceState {
+  stationId: string;
+  queuedOrderIds: string[];
+  maxQueueSize: number;
+  processingTimeSec: number;
+  activeTask: WorkerTask | null;
 }
 
 export interface Order {

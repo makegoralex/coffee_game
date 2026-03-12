@@ -46,7 +46,22 @@ async function bootstrap(): Promise<void> {
       </section>
 
       <section class="card">
-        <button class="primary-btn" id="sell-btn">Продать кофе (+0 ₽)</button>
+        <button class="primary-btn" id="sell-btn">Выдать готовый заказ</button>
+      </section>
+
+      <section class="card">
+        <div class="row">
+          <span class="label">Посетители в очереди</span>
+          <span class="label" id="queue-size">0</span>
+        </div>
+        <div class="row">
+          <span class="label">Готовится сейчас</span>
+          <span class="label" id="brewing-order">—</span>
+        </div>
+        <div class="row">
+          <span class="label">Готово к выдаче</span>
+          <span class="label" id="ready-orders">0</span>
+        </div>
       </section>
 
       <section class="card upgrade">
@@ -68,15 +83,29 @@ async function bootstrap(): Promise<void> {
   const passiveEl = root.querySelector<HTMLElement>('#passive-info');
   const offlineEl = root.querySelector<HTMLElement>('#offline-info');
   const sellBtn = root.querySelector<HTMLButtonElement>('#sell-btn');
+  const queueSizeEl = root.querySelector<HTMLElement>('#queue-size');
+  const brewingOrderEl = root.querySelector<HTMLElement>('#brewing-order');
+  const readyOrdersEl = root.querySelector<HTMLElement>('#ready-orders');
   const upgradeBtn = root.querySelector<HTMLButtonElement>('#upgrade-btn');
   const upgradeCostEl = root.querySelector<HTMLElement>('#upgrade-cost');
   const equipLevelEl = root.querySelector<HTMLElement>('#equip-level');
 
-  if (!moneyEl || !passiveEl || !offlineEl || !sellBtn || !upgradeBtn || !upgradeCostEl || !equipLevelEl) {
+  if (!moneyEl || !passiveEl || !offlineEl || !sellBtn || !queueSizeEl || !brewingOrderEl || !readyOrdersEl || !upgradeBtn || !upgradeCostEl || !equipLevelEl) {
     throw new Error('Missing UI elements');
   }
 
-  const ui = { moneyEl, passiveEl, offlineEl, sellBtn, upgradeBtn, upgradeCostEl, equipLevelEl };
+  const ui = {
+    moneyEl,
+    passiveEl,
+    offlineEl,
+    sellBtn,
+    queueSizeEl,
+    brewingOrderEl,
+    readyOrdersEl,
+    upgradeBtn,
+    upgradeCostEl,
+    equipLevelEl,
+  };
 
   if (offlineIncome > 0) {
     ui.offlineEl.textContent = `Оффлайн-доход: +${formatMoney(offlineIncome)}`;
@@ -88,11 +117,16 @@ async function bootstrap(): Promise<void> {
 
     ui.moneyEl.textContent = formatMoney(currentState.player.wallet.soft);
     ui.passiveEl.textContent = `Пассивный доход: ${currentState.cafe.passiveIncomePerSecond.toFixed(1)} ₽/сек`;
-    ui.sellBtn.textContent = `Продать кофе (+${formatMoney(currentState.cafe.manualSaleIncome)})`;
+    ui.sellBtn.textContent = `Выдать готовый заказ (${currentState.cafe.readyOrderIds.length})`;
+
+    ui.queueSizeEl.textContent = String(currentState.cafe.customerQueue.customerIds.length);
+    ui.brewingOrderEl.textContent = currentState.cafe.brewingOrderId ?? '—';
+    ui.readyOrdersEl.textContent = String(currentState.cafe.readyOrderIds.length);
 
     ui.equipLevelEl.textContent = String(currentState.cafe.equipmentLevel);
     ui.upgradeCostEl.textContent = formatMoney(cost);
     ui.upgradeBtn.disabled = currentState.player.wallet.soft < cost;
+    ui.sellBtn.disabled = currentState.cafe.readyOrderIds.length === 0;
   }
 
   ui.sellBtn.addEventListener('click', () => {
@@ -119,6 +153,7 @@ async function bootstrap(): Promise<void> {
     lastTickAt = nowPerf;
 
     app.tick(deltaSeconds);
+    render();
   }, 250);
 
   const saveProgress = async (): Promise<void> => {
