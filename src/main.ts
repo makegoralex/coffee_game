@@ -20,6 +20,10 @@ function sanitizeCustomer(raw: Partial<WaitingCustomer>): WaitingCustomer {
     recipeId: raw.recipeId === 'espresso' || raw.recipeId === 'americano' || raw.recipeId === 'latte' ? raw.recipeId : 'americano',
     patienceSec: Math.max(3, toFiniteNumber(raw.patienceSec, 12)),
     waitedSec: Math.max(0, toFiniteNumber(raw.waitedSec, 0)),
+    status:
+      raw.status === 'waiting' || raw.status === 'ordering' || raw.status === 'brewing' || raw.status === 'served' || raw.status === 'left'
+        ? raw.status
+        : 'waiting',
   };
 }
 
@@ -81,6 +85,35 @@ function sanitizeState(raw: GameState): GameState {
         lostCustomers: Math.max(0, Math.floor(toFiniteNumber(raw.cafe?.serviceStats?.lostCustomers, 0))),
         wrongOrders: Math.max(0, Math.floor(toFiniteNumber(raw.cafe?.serviceStats?.wrongOrders, 0))),
       },
+      activeCustomers: Array.isArray(raw.cafe?.activeCustomers)
+        ? raw.cafe.activeCustomers.map((customer) => sanitizeCustomer(customer))
+        : [],
+      customerQueue:
+        raw.cafe?.customerQueue && typeof raw.cafe.customerQueue === 'object'
+          ? {
+              customerIds: Array.isArray(raw.cafe.customerQueue.customerIds)
+                ? raw.cafe.customerQueue.customerIds.filter((id): id is string => typeof id === 'string')
+                : [],
+              maxSize: Math.max(1, Math.floor(toFiniteNumber(raw.cafe.customerQueue.maxSize, 8))),
+            }
+          : { customerIds: [], maxSize: 8 },
+      activeOrders: Array.isArray(raw.cafe?.activeOrders)
+        ? raw.cafe.activeOrders.map((order) => ({
+            id: typeof order.id === 'string' ? order.id : crypto.randomUUID(),
+            customerId: typeof order.customerId === 'string' ? order.customerId : crypto.randomUUID(),
+            recipeId: typeof order.recipeId === 'string' ? order.recipeId : 'americano',
+            progressSec: Math.max(0, toFiniteNumber(order.progressSec, 0)),
+            status: order.status,
+            value: Math.max(0, toFiniteNumber(order.value, 0)),
+          }))
+        : [],
+      orderQueue: Array.isArray(raw.cafe?.orderQueue)
+        ? raw.cafe.orderQueue.filter((id): id is string => typeof id === 'string')
+        : [],
+      readyOrderIds: Array.isArray(raw.cafe?.readyOrderIds)
+        ? raw.cafe.readyOrderIds.filter((id): id is string => typeof id === 'string')
+        : [],
+      brewingOrderId: typeof raw.cafe?.brewingOrderId === 'string' ? raw.cafe.brewingOrderId : null,
     },
     meta: {
       ...initial.meta,

@@ -25,7 +25,7 @@ export interface WaitingCustomer {
   recipeId: RecipeId;
   patienceSec: number;
   waitedSec: number;
-  status?: 'waiting' | 'ordering' | 'brewing' | 'served' | 'left';
+  status: 'waiting' | 'ordering' | 'brewing' | 'served' | 'left';
 }
 
 export interface ActiveOrder {
@@ -60,8 +60,22 @@ export interface Order {
   id: string;
   customerId: string;
   recipeId: string;
+  progressSec?: number;
   status?: 'queued' | 'brewing' | 'ready' | 'served' | 'cancelled';
+  value?: number;
   createdAtUtcMs?: number;
+}
+
+export interface ServiceState {
+  customerQueue: {
+    customerIds: string[];
+    maxSize: number;
+  };
+  orderQueue: string[];
+  readyOrderIds: string[];
+  brewingOrderId: string | null;
+  activeCustomers: CustomerState[];
+  activeOrders: Order[];
 }
 
 export interface CafeState {
@@ -84,13 +98,16 @@ export interface CafeState {
   rating: number;
   serviceStats: ServiceStats;
 
-  // Legacy optional fields for backward compatibility with older game loop code.
-  activeCustomers?: CustomerState[];
-  customerQueue?: string[];
-  activeOrders?: Array<{ id: string; customerId: string; recipeId: string; progressSec?: number }>;
-  orderQueue?: string[];
-  readyOrderIds?: string[];
-  brewingOrderId?: string | null;
+  // Legacy fields retained for mixed deploy branches.
+  activeCustomers: CustomerState[];
+  customerQueue: {
+    customerIds: string[];
+    maxSize: number;
+  };
+  activeOrders: Order[];
+  orderQueue: string[];
+  readyOrderIds: string[];
+  brewingOrderId: string | null;
 }
 
 export interface MetaProgressState {

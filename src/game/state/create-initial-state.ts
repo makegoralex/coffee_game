@@ -56,6 +56,16 @@ export function createInitialState(): GameState {
         lostCustomers: 0,
         wrongOrders: 0,
       },
+
+      activeCustomers: [],
+      customerQueue: {
+        customerIds: [],
+        maxSize: 8,
+      },
+      activeOrders: [],
+      orderQueue: [],
+      readyOrderIds: [],
+      brewingOrderId: null,
     },
     meta: {
       prestigeLevel: 0,

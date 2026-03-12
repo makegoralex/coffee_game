@@ -42,6 +42,7 @@ export class GameApp {
       recipeId: this.pickRecipeId(),
       patienceSec: 10 + Math.random() * 8,
       waitedSec: 0,
+      status: 'waiting',
     };
   }
 
