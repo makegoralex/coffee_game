@@ -1,0 +1,10 @@
+{
+  "currency": "soft",
+  "baseAverageCheck": 12,
+  "baseCustomerFlowPerMinute": 6,
+  "maxOfflineSeconds": 28800,
+  "priceScaling": {
+    "upgradeBaseExponent": 1.14,
+    "zoneUnlockExponent": 1.25
+  }
+}
