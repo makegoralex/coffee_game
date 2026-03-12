@@ -83,6 +83,7 @@ export interface CafeState {
   readyOrders: number;
   nextVisitorInSec: number;
   brewDurationSec: number;
+  spawnRemainder: number;
 }
 
 export interface MetaProgressState {

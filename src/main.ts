@@ -44,6 +44,7 @@ function sanitizeState(raw: GameState): GameState {
       readyOrders: Math.max(0, Math.floor(toFiniteNumber(raw.cafe?.readyOrders, initial.cafe.readyOrders))),
       nextVisitorInSec: Math.max(0.1, toFiniteNumber(raw.cafe?.nextVisitorInSec, initial.cafe.nextVisitorInSec)),
       brewDurationSec: Math.max(1, toFiniteNumber(raw.cafe?.brewDurationSec, initial.cafe.brewDurationSec)),
+      spawnRemainder: Math.max(0, toFiniteNumber(raw.cafe?.spawnRemainder, initial.cafe.spawnRemainder)),
     },
     meta: {
       ...initial.meta,

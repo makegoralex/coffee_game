@@ -5,6 +5,9 @@ export type GameEvent =
   | { type: 'upgrade.bought'; upgradeId: string; newLevel: number }
   | { type: 'customer.spawned'; customerId: string }
   | { type: 'customer.leftQueue'; customerId: string; reason: 'served' | 'left' }
+  | { type: 'customer.lost'; customerId: string; reason: 'timeout' | 'queue_full' | 'left' }
+  | { type: 'order.created'; orderId: string; customerId: string }
+  | { type: 'order.completed'; orderId: string; amount: number }
   | { type: 'monetization.rewardGranted'; rewardId: string };
 
 type Handler<T extends GameEvent> = (event: T) => void;

@@ -58,6 +58,7 @@ export function createInitialState(): GameState {
       readyOrders: 0,
       nextVisitorInSec: 2,
       brewDurationSec: 4,
+      spawnRemainder: 0,
     },
     meta: {
       prestigeLevel: 0,
