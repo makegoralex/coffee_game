@@ -1,0 +1,20 @@
+{
+  "rewarded": [
+    {
+      "id": "x2_income_5m",
+      "rewardType": "income_multiplier",
+      "multiplier": 2,
+      "durationSec": 300,
+      "cooldownSec": 60
+    }
+  ],
+  "iap": [
+    {
+      "productId": "starter_pack",
+      "type": "bundle",
+      "premiumCurrency": 200,
+      "softCurrency": 1500,
+      "removeInterstitial": false
+    }
+  ]
+}
