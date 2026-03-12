@@ -53,6 +53,8 @@ body {
   margin-top: 6px;
   font-size: 34px;
   font-weight: 700;
+  color: #2b2317;
+  min-height: 42px;
 }
 
 .hint {

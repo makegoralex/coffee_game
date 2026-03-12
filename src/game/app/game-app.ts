@@ -10,20 +10,51 @@ export class GameApp {
     private readonly state: GameState,
   ) {}
 
-  public tick(deltaSeconds: number): void {
-    const income = this.economy.computePassiveIncome(this.state, deltaSeconds);
-    if (income <= 0) {
-      return;
-    }
+  private getSpawnIntervalSec(): number {
+    return Math.max(1, 60 / this.state.cafe.customerFlowPerMinute);
+  }
 
-    this.state.player.wallet.soft += income;
+  private getBrewDurationSec(): number {
+    const levelBonus = 1 + (this.state.cafe.equipmentLevel - 1) * 0.15;
+    return Math.max(1.2, this.state.cafe.brewDurationSec / levelBonus);
+  }
+
+  public tick(deltaSeconds: number): void {
     this.state.timing.totalSessionSeconds += deltaSeconds;
     this.state.timing.lastActiveTimestampUtcMs = Date.now();
-    this.eventBus.emit({ type: 'economy.moneyEarned', amount: income });
+
+    this.state.cafe.nextVisitorInSec -= deltaSeconds;
+    while (this.state.cafe.nextVisitorInSec <= 0) {
+      this.state.cafe.visitorQueue += 1;
+      this.state.cafe.nextVisitorInSec += this.getSpawnIntervalSec();
+      this.eventBus.emit({ type: 'customer.spawned', customerId: crypto.randomUUID() });
+    }
+
+    if (!this.state.cafe.hasActiveOrder && this.state.cafe.visitorQueue > 0) {
+      this.state.cafe.visitorQueue -= 1;
+      this.state.cafe.hasActiveOrder = true;
+      this.state.cafe.activeOrderProgressSec = 0;
+      this.eventBus.emit({ type: 'customer.leftQueue', customerId: crypto.randomUUID(), reason: 'served' });
+    }
+
+    if (this.state.cafe.hasActiveOrder) {
+      this.state.cafe.activeOrderProgressSec += deltaSeconds;
+      if (this.state.cafe.activeOrderProgressSec >= this.getBrewDurationSec()) {
+        this.state.cafe.hasActiveOrder = false;
+        this.state.cafe.activeOrderProgressSec = 0;
+        this.state.cafe.readyOrders += 1;
+      }
+    }
+
   }
 
   public sellCoffee(): void {
+    if (this.state.cafe.readyOrders <= 0) {
+      return;
+    }
+
     const amount = this.state.cafe.manualSaleIncome;
+    this.state.cafe.readyOrders -= 1;
     this.state.player.wallet.soft += amount;
     this.eventBus.emit({ type: 'coffee.sold', amount });
     this.eventBus.emit({ type: 'economy.moneyEarned', amount });
@@ -37,8 +68,7 @@ export class GameApp {
 
     this.state.player.wallet.soft -= cost;
     this.state.cafe.equipmentLevel += 1;
-    this.state.cafe.manualSaleIncome = Math.round(this.state.cafe.manualSaleIncome * 1.25);
-    this.state.cafe.passiveIncomePerSecond = Number((this.state.cafe.passiveIncomePerSecond * 1.2).toFixed(2));
+    this.state.cafe.manualSaleIncome = Math.round(this.state.cafe.manualSaleIncome * 1.2);
 
     this.eventBus.emit({ type: 'economy.moneySpent', amount: cost });
     this.eventBus.emit({
@@ -57,7 +87,8 @@ export class GameApp {
   public computeOfflineIncome(nowUtcMs: number, maxOfflineSeconds: number): number {
     const elapsedSeconds = Math.max(0, Math.floor((nowUtcMs - this.state.timing.lastActiveTimestampUtcMs) / 1000));
     const clamped = Math.min(elapsedSeconds, maxOfflineSeconds);
-    return this.economy.computePassiveIncome(this.state, clamped);
+    const estimatedOrders = Math.floor(clamped / this.getBrewDurationSec());
+    return estimatedOrders * this.state.cafe.manualSaleIncome * 0.5;
   }
 
   public applyOfflineIncome(amount: number, nowUtcMs: number): void {
