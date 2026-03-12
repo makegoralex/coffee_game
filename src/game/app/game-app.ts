@@ -295,7 +295,7 @@ export class GameApp {
     this.state.cafe.readyOrderIds.push(order.id);
   }
 
-  private serveReadyOrder(): void {
+  private serveReadyOrderLegacy(): void {
     const orderId = this.state.cafe.readyOrderIds.shift();
     if (!orderId) {
       return;
