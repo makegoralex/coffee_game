@@ -8,6 +8,8 @@ import './styles.css';
 
 const SAVE_KEY = 'coffee_game_save_v1';
 const MAX_OFFLINE_SECONDS = 60 * 60 * 4;
+const FIXED_STEP_SECONDS = 1 / 10;
+const MAX_FRAME_SECONDS = 0.25;
 
 function formatMoney(value: number): string {
   return `${Math.floor(value).toLocaleString('ru-RU')} ₽`;
@@ -120,10 +122,17 @@ async function bootstrap(): Promise<void> {
   });
 
   let lastTick = performance.now();
+  let accumulator = 0;
   const loop = (timestamp: number): void => {
-    const deltaSec = Math.min((timestamp - lastTick) / 1000, 0.25);
+    const deltaSec = Math.min((timestamp - lastTick) / 1000, MAX_FRAME_SECONDS);
     lastTick = timestamp;
-    app.tick(deltaSec);
+
+    accumulator += deltaSec;
+    while (accumulator >= FIXED_STEP_SECONDS) {
+      app.tick(FIXED_STEP_SECONDS);
+      accumulator -= FIXED_STEP_SECONDS;
+    }
+
     requestAnimationFrame(loop);
   };
 
@@ -134,7 +143,7 @@ async function bootstrap(): Promise<void> {
     await saveService.save(app.toSaveData(Date.now()));
   };
 
-  window.setInterval(() => {
+  const autosaveIntervalId = window.setInterval(() => {
     void persist();
   }, 5000);
 
@@ -146,6 +155,11 @@ async function bootstrap(): Promise<void> {
 
   window.addEventListener('beforeunload', () => {
     void persist();
+  });
+
+  window.addEventListener('pagehide', () => {
+    void persist();
+    window.clearInterval(autosaveIntervalId);
   });
 }
 
