@@ -1,0 +1,25 @@
+{
+  "upgrades": [
+    {
+      "id": "grinder_speed",
+      "maxLevel": 25,
+      "baseCost": 30,
+      "costExponent": 1.16,
+      "effect": { "type": "station_speed", "targetId": "espresso_machine", "perLevel": 0.04 }
+    },
+    {
+      "id": "menu_price",
+      "maxLevel": 20,
+      "baseCost": 45,
+      "costExponent": 1.18,
+      "effect": { "type": "average_check", "perLevel": 0.03 }
+    },
+    {
+      "id": "street_sign",
+      "maxLevel": 15,
+      "baseCost": 60,
+      "costExponent": 1.2,
+      "effect": { "type": "customer_flow", "perLevel": 0.05 }
+    }
+  ]
+}
