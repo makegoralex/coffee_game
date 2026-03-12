@@ -36,6 +36,13 @@ export interface CafeState {
   manualSaleIncome: number;
   passiveIncomePerSecond: number;
   equipmentUpgradeBaseCost: number;
+  visitorQueue: number;
+  hasActiveOrder: boolean;
+  activeOrderProgressSec: number;
+  readyOrders: number;
+  nextVisitorInSec: number;
+  brewDurationSec: number;
+  spawnRemainder: number;
 }
 
 export interface MetaProgressState {
