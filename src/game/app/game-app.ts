@@ -2,11 +2,7 @@ import customersConfig from '@data/configs/customers.json';
 import economyConfig from '@data/configs/economy.json';
 import { EconomySystem } from '@core/economy/economy-system';
 import { EventBus } from '@game/events/event-bus';
-import type { CustomerState, GameState, Order, SaveData, ServiceState, WorkerTask } from '@shared/types/state';
-
-const STATION_PIPELINE = ['cashier', 'espresso_machine', 'pickup'] as const;
-
-type StationId = (typeof STATION_PIPELINE)[number];
+import type { CustomerState, GameState, Order, SaveData } from '@shared/types/state';
 
 type CustomerArchetype = (typeof customersConfig.archetypes)[number];
 
@@ -29,12 +25,13 @@ export class GameApp {
 
     this.updatePatience(deltaSeconds);
     this.spawnCustomers(deltaSeconds);
-    this.feedCashierQueueFromVisitors();
-    this.processServices(deltaSeconds);
+    this.moveWaitingCustomersToOrders();
+    this.startBrewingIfPossible();
+    this.processBrewing(deltaSeconds);
   }
 
   public sellCoffee(): void {
-    this.processServices(0);
+    this.serveReadyOrder();
   }
 
   public tryBuyEquipmentUpgrade(): boolean {
@@ -102,6 +99,7 @@ export class GameApp {
       patienceSec: archetype.patienceSec,
       orderValue: Math.round(this.state.cafe.averageCheck * archetype.valueMultiplier),
       waitedSec: 0,
+      status: 'waiting',
     };
 
     this.state.cafe.activeCustomers.push(customer);
@@ -115,99 +113,86 @@ export class GameApp {
     this.eventBus.emit({ type: 'customer.spawned', customerId: customer.id, archetypeId: archetype.id });
   }
 
-  private feedCashierQueueFromVisitors(): void {
-    const cashierService = this.getService('cashier');
-    if (!cashierService) {
-      return;
-    }
-
-    while (
-      this.state.cafe.customerQueue.customerIds.length > 0
-      && cashierService.queuedOrderIds.length < cashierService.maxQueueSize
-    ) {
+  private moveWaitingCustomersToOrders(): void {
+    while (this.state.cafe.customerQueue.customerIds.length > 0) {
       const customerId = this.state.cafe.customerQueue.customerIds.shift();
-      if (!customerId || !this.findCustomer(customerId)) {
+      const customer = customerId ? this.findCustomer(customerId) : undefined;
+      if (!customer) {
         continue;
       }
 
-      const order = this.createOrder(customerId);
+      customer.status = 'ordering';
+      const order = this.createOrder(customer.id);
       this.state.cafe.activeOrders.push(order);
-      cashierService.queuedOrderIds.push(order.id);
+      this.state.cafe.orderQueue.push(order.id);
       this.eventBus.emit({ type: 'order.created', orderId: order.id, customerId: order.customerId });
     }
   }
 
-  private processServices(deltaSeconds: number): void {
-    for (const stationId of STATION_PIPELINE) {
-      const service = this.getService(stationId);
-      if (!service) {
-        continue;
-      }
-
-      if (!service.activeTask && service.queuedOrderIds.length > 0) {
-        const nextOrderId = service.queuedOrderIds.shift();
-        if (nextOrderId) {
-          const order = this.findOrder(nextOrderId);
-          if (order && this.findCustomer(order.customerId)) {
-            service.activeTask = this.createTask(order, service);
-          }
-        }
-      }
-
-      if (!service.activeTask) {
-        continue;
-      }
-
-      service.activeTask.remainingSec = Math.max(0, service.activeTask.remainingSec - deltaSeconds);
-      if (service.activeTask.remainingSec > 0) {
-        continue;
-      }
-
-      this.completeTask(service);
+  private startBrewingIfPossible(): void {
+    if (this.state.cafe.brewingOrderId || this.state.cafe.orderQueue.length === 0) {
+      return;
     }
+
+    const orderId = this.state.cafe.orderQueue.shift();
+    if (!orderId) {
+      return;
+    }
+
+    const order = this.findOrder(orderId);
+    const customer = order ? this.findCustomer(order.customerId) : undefined;
+    if (!order || !customer) {
+      return;
+    }
+
+    order.status = 'brewing';
+    customer.status = 'brewing';
+    this.state.cafe.brewingOrderId = order.id;
   }
 
-  private completeTask(service: ServiceState): void {
-    const task = service.activeTask;
-    if (!task) {
+  private processBrewing(deltaSeconds: number): void {
+    const brewingOrderId = this.state.cafe.brewingOrderId;
+    if (!brewingOrderId) {
       return;
     }
 
-    const order = this.findOrder(task.orderId);
-    if (!order || !this.findCustomer(order.customerId)) {
-      service.activeTask = null;
+    const order = this.findOrder(brewingOrderId);
+    const customer = order ? this.findCustomer(order.customerId) : undefined;
+
+    if (!order || !customer) {
+      this.state.cafe.brewingOrderId = null;
       return;
     }
 
-    const nextStation = this.getNextStation(order.currentStationId as StationId);
-    if (!nextStation) {
-      this.completeOrder(order.id);
-      service.activeTask = null;
+    order.remainingBrewSec = Math.max(0, order.remainingBrewSec - deltaSeconds);
+    if (order.remainingBrewSec > 0) {
       return;
     }
 
-    const nextService = this.getService(nextStation);
-    if (!nextService) {
-      service.activeTask = null;
-      return;
-    }
-
-    if (nextService.queuedOrderIds.length >= nextService.maxQueueSize) {
-      return;
-    }
-
-    order.currentStationId = nextStation;
-    nextService.queuedOrderIds.push(order.id);
-    service.activeTask = null;
+    order.status = 'ready';
+    this.state.cafe.brewingOrderId = null;
+    this.state.cafe.readyOrderIds.push(order.id);
   }
 
-  private completeOrder(orderId: string): void {
+  private serveReadyOrder(): void {
+    const orderId = this.state.cafe.readyOrderIds.shift();
+    if (!orderId) {
+      return;
+    }
+
     const orderIndex = this.state.cafe.activeOrders.findIndex((entry) => entry.id === orderId);
     if (orderIndex === -1) {
       return;
     }
 
     const order = this.state.cafe.activeOrders[orderIndex];
+    const customer = this.findCustomer(order.customerId);
+
+    if (customer) {
+      customer.status = 'served';
+    }
+
+    order.status = 'served';
     this.state.cafe.activeOrders.splice(orderIndex, 1);
     this.removeCustomer(order.customerId);
 
@@ -226,6 +211,10 @@ export class GameApp {
     const lostCustomerIds: string[] = [];
 
     for (const customer of this.state.cafe.activeCustomers) {
+      if (customer.status === 'served' || customer.status === 'left') {
+        continue;
+      }
+
       customer.waitedSec += deltaSeconds;
       if (customer.waitedSec >= customer.patienceSec) {
         lostCustomerIds.push(customer.id);
@@ -238,26 +227,25 @@ export class GameApp {
   }
 
   private loseCustomer(customerId: string): void {
-    this.removeCustomer(customerId);
+    const customer = this.findCustomer(customerId);
+    if (customer) {
+      customer.status = 'left';
+    }
 
     const order = this.state.cafe.activeOrders.find((entry) => entry.customerId === customerId);
     if (order) {
+      order.status = 'cancelled';
       this.removeOrder(order.id);
-    }
+      this.state.cafe.orderQueue = this.state.cafe.orderQueue.filter((id) => id !== order.id);
+      this.state.cafe.readyOrderIds = this.state.cafe.readyOrderIds.filter((id) => id !== order.id);
 
-    this.state.cafe.customerQueue.customerIds = this.state.cafe.customerQueue.customerIds.filter((id) => id !== customerId);
-
-    for (const service of this.state.cafe.services) {
-      service.queuedOrderIds = service.queuedOrderIds.filter((orderId) => {
-        const queuedOrder = this.findOrder(orderId);
-        return queuedOrder ? queuedOrder.customerId !== customerId : false;
-      });
-
-      if (service.activeTask && service.activeTask.customerId === customerId) {
-        service.activeTask = null;
+      if (this.state.cafe.brewingOrderId === order.id) {
+        this.state.cafe.brewingOrderId = null;
       }
     }
 
+    this.state.cafe.customerQueue.customerIds = this.state.cafe.customerQueue.customerIds.filter((id) => id !== customerId);
+    this.removeCustomer(customerId);
     this.eventBus.emit({ type: 'customer.lost', customerId });
   }
 
@@ -267,32 +255,13 @@ export class GameApp {
       id: this.createId('order'),
       customerId,
       value: customer?.orderValue ?? economyConfig.baseAverageCheck,
-      currentStationId: 'cashier',
+      status: 'queued',
+      remainingBrewSec: this.getBrewingDurationSec(),
     };
   }
 
-  private createTask(order: Order, service: ServiceState): WorkerTask {
-    return {
-      id: this.createId('task'),
-      orderId: order.id,
-      customerId: order.customerId,
-      stationId: service.stationId,
-      remainingSec: service.processingTimeSec,
-      totalSec: service.processingTimeSec,
-    };
-  }
-
-  private getService(stationId: StationId): ServiceState | undefined {
-    return this.state.cafe.services.find((service) => service.stationId === stationId);
-  }
-
-  private getNextStation(stationId: StationId): StationId | null {
-    const index = STATION_PIPELINE.indexOf(stationId);
-    if (index === -1 || index >= STATION_PIPELINE.length - 1) {
-      return null;
-    }
-
-    return STATION_PIPELINE[index + 1];
+  private getBrewingDurationSec(): number {
+    return this.state.cafe.stations[1]?.processingTimeSec ?? 5;
   }
 
   private pickArchetype(): CustomerArchetype {
