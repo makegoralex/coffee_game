@@ -4,6 +4,7 @@
 
 - Подробная архитектура: `docs/architecture.md`
 - MVP и roadmap: `docs/mvp-plan.md`
+- Заметки по реализованному сервисному циклу: `docs/service-loop-notes.md`
 - Стартовый scaffold TypeScript + Phaser 3: `src/`
 
 ## Quick start

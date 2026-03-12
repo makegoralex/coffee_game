@@ -1,4 +1,26 @@
-import type { GameState } from '@shared/types/state';
+import economyConfig from '@data/configs/economy.json';
+import stationsConfig from '@data/configs/stations.json';
+import type { GameState, ServiceState, StationState } from '@shared/types/state';
+
+function createStationState(): StationState[] {
+  return stationsConfig.stations.map((station) => ({
+    id: station.id,
+    level: 1,
+    queueSize: station.baseQueueSize,
+    processingTimeSec: station.baseProcessingTimeSec,
+    throughputPerMinute: Number((60 / station.baseProcessingTimeSec).toFixed(2)),
+  }));
+}
+
+function createServices(): ServiceState[] {
+  return stationsConfig.stations.map((station) => ({
+    stationId: station.id,
+    queuedOrderIds: [],
+    maxQueueSize: station.baseQueueSize,
+    processingTimeSec: station.baseProcessingTimeSec,
+    activeTask: null,
+  }));
+}
 
 export function createInitialState(): GameState {
   const now = Date.now();
