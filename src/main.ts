@@ -103,6 +103,7 @@ function sanitizeState(raw: GameState): GameState {
             customerId: typeof order.customerId === 'string' ? order.customerId : crypto.randomUUID(),
             recipeId: typeof order.recipeId === 'string' ? order.recipeId : 'americano',
             progressSec: Math.max(0, toFiniteNumber(order.progressSec, 0)),
+            remainingBrewSec: Math.max(0, toFiniteNumber(order.remainingBrewSec, 0)),
             status: order.status,
             value: Math.max(0, toFiniteNumber(order.value, 0)),
           }))

@@ -26,6 +26,8 @@ export interface WaitingCustomer {
   patienceSec: number;
   waitedSec: number;
   status: 'waiting' | 'ordering' | 'brewing' | 'served' | 'left';
+  archetypeId?: string;
+  orderValue?: number;
 }
 
 export interface ActiveOrder {
@@ -54,15 +56,18 @@ export type CustomerState = WaitingCustomer;
 export interface CustomerArchetype {
   id: string;
   patienceSec: number;
-  orderValue: number;
+  orderValue?: number;
+  valueMultiplier?: number;
+  spawnWeight?: number;
 }
 export interface Order {
   id: string;
   customerId: string;
   recipeId: string;
-  progressSec?: number;
+  progressSec: number;
+  remainingBrewSec: number;
   status?: 'queued' | 'brewing' | 'ready' | 'served' | 'cancelled';
-  value?: number;
+  value: number;
   createdAtUtcMs?: number;
 }
 
