@@ -53,6 +53,8 @@ body {
   margin-top: 6px;
   font-size: 34px;
   font-weight: 700;
+  color: #2b2317;
+  min-height: 42px;
 }
 
 .hint {
@@ -89,6 +91,21 @@ button:disabled {
 .upgrade h2 {
   margin: 0 0 10px;
   font-size: 20px;
+}
+
+.card h2 {
+  margin: 0 0 10px;
+  font-size: 20px;
+}
+
+.ready-orders {
+  display: grid;
+  gap: 8px;
+}
+
+.ready-btn {
+  padding: 10px 12px;
+  font-size: 14px;
 }
 
 .row {
