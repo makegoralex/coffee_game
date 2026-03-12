@@ -11,3 +11,4 @@ bus.on('economy.moneyEarned', (event) => {
 
 const app = new GameApp(bus, state);
 app.tick(1);
+// deploy test Thu Mar 12 02:32:01 PM MSK 2026
