@@ -26,9 +26,41 @@ export interface CustomerState {
   waitedSec: number;
 }
 
+export interface Order {
+  id: string;
+  customerId: string;
+  value: number;
+  currentStationId: string;
+}
+
+export interface WorkerTask {
+  id: string;
+  orderId: string;
+  customerId: string;
+  stationId: string;
+  remainingSec: number;
+  totalSec: number;
+}
+
+export interface QueueState {
+  customerIds: string[];
+  maxSize: number;
+}
+
+export interface ServiceState {
+  stationId: string;
+  queuedOrderIds: string[];
+  maxQueueSize: number;
+  processingTimeSec: number;
+  activeTask: WorkerTask | null;
+}
+
 export interface CafeState {
   stations: StationState[];
   activeCustomers: CustomerState[];
+  activeOrders: Order[];
+  customerQueue: QueueState;
+  services: ServiceState[];
   unlockedZoneIds: string[];
   averageCheck: number;
   customerFlowPerMinute: number;
@@ -36,6 +68,7 @@ export interface CafeState {
   manualSaleIncome: number;
   passiveIncomePerSecond: number;
   equipmentUpgradeBaseCost: number;
+  spawnRemainder: number;
 }
 
 export interface MetaProgressState {
