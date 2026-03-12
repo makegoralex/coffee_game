@@ -8,7 +8,7 @@ root.style.background = '#111';
 root.style.color = '#fff';
 root.style.fontFamily = 'Arial, sans-serif';
 root.innerHTML = `
-  <h1>Coffee Game</h1>
+  <h1>Coffee Ga1me</h1>
   <p>Сайт снова работает.</p>
 `;
 document.body.innerHTML = '';
