@@ -1,4 +1,4 @@
-# Coffee Game — Architecture Scaffold
+# Coffee Game — Architecture Scaffold1
 
 Проект-заготовка для HTML5 idle/tycoon игры «Управление своей кофейней» под Яндекс Игры.
 
