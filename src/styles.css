@@ -93,6 +93,21 @@ button:disabled {
   font-size: 20px;
 }
 
+.card h2 {
+  margin: 0 0 10px;
+  font-size: 20px;
+}
+
+.ready-orders {
+  display: grid;
+  gap: 8px;
+}
+
+.ready-btn {
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
 .row {
   display: flex;
   justify-content: space-between;

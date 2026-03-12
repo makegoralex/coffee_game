@@ -18,11 +18,12 @@ export interface StationState {
   throughputPerMinute: number;
 }
 
-export interface CustomerState {
+export type RecipeId = 'espresso' | 'americano' | 'latte';
+
+export interface WaitingCustomer {
   id: string;
-  archetypeId: string;
+  recipeId: RecipeId;
   patienceSec: number;
-  orderValue: number;
   waitedSec: number;
   status: CustomerStatus;
 }
@@ -61,15 +62,29 @@ export interface ServiceState {
   activeTask: WorkerTask | null;
 }
 
+export interface ActiveOrder {
+  orderId: string;
+  customerId: string;
+  recipeId: RecipeId;
+  progressSec: number;
+  requiredSec: number;
+}
+
+export interface ReadyOrder {
+  orderId: string;
+  customerId: string;
+  recipeId: RecipeId;
+  price: number;
+}
+
+export interface ServiceStats {
+  servedCustomers: number;
+  lostCustomers: number;
+  wrongOrders: number;
+}
+
 export interface CafeState {
   stations: StationState[];
-  activeCustomers: CustomerState[];
-  activeOrders: Order[];
-  orderQueue: string[];
-  brewingOrderId: string | null;
-  readyOrderIds: string[];
-  customerQueue: QueueState;
-  services: ServiceState[];
   unlockedZoneIds: string[];
   averageCheck: number;
   customerFlowPerMinute: number;
@@ -77,13 +92,16 @@ export interface CafeState {
   manualSaleIncome: number;
   passiveIncomePerSecond: number;
   equipmentUpgradeBaseCost: number;
-  visitorQueue: number;
-  hasActiveOrder: boolean;
-  activeOrderProgressSec: number;
-  readyOrders: number;
   nextVisitorInSec: number;
-  brewDurationSec: number;
   spawnRemainder: number;
+
+  queueCustomers: WaitingCustomer[];
+  activeOrder: ActiveOrder | null;
+  pickupQueueCustomerIds: string[];
+  readyOrders: ReadyOrder[];
+
+  rating: number;
+  serviceStats: ServiceStats;
 }
 
 export interface MetaProgressState {
