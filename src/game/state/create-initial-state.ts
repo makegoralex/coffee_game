@@ -37,9 +37,6 @@ export function createInitialState(): GameState {
       stations: createStationState(),
       activeCustomers: [],
       activeOrders: [],
-      orderQueue: [],
-      brewingOrderId: null,
-      readyOrderIds: [],
       customerQueue: {
         customerIds: [],
         maxSize: stationsConfig.stations[0]?.baseQueueSize ?? 0,

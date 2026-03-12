@@ -61,13 +61,39 @@ export interface ServiceState {
   activeTask: WorkerTask | null;
 }
 
+export interface Order {
+  id: string;
+  customerId: string;
+  value: number;
+  currentStationId: string;
+}
+
+export interface WorkerTask {
+  id: string;
+  orderId: string;
+  customerId: string;
+  stationId: string;
+  remainingSec: number;
+  totalSec: number;
+}
+
+export interface QueueState {
+  customerIds: string[];
+  maxSize: number;
+}
+
+export interface ServiceState {
+  stationId: string;
+  queuedOrderIds: string[];
+  maxQueueSize: number;
+  processingTimeSec: number;
+  activeTask: WorkerTask | null;
+}
+
 export interface CafeState {
   stations: StationState[];
   activeCustomers: CustomerState[];
   activeOrders: Order[];
-  orderQueue: string[];
-  brewingOrderId: string | null;
-  readyOrderIds: string[];
   customerQueue: QueueState;
   services: ServiceState[];
   unlockedZoneIds: string[];
