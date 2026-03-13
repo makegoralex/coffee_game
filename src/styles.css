@@ -201,6 +201,22 @@ body {
   margin-top: 4px;
 }
 
+.sell-btn {
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid #4d1f08;
+  background: #2b2b2b;
+  color: #fff;
+  font-size: 14px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.sell-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .map-screen {
   background: #7b3d18;
   padding: 16px;
@@ -431,6 +447,9 @@ body {
 .chat-area {
   font-size: 14px;
   padding: 6px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 6px;
 }
 
 .panel-title {
@@ -499,4 +518,26 @@ body {
   max-height: 150px;
   overflow: auto;
   padding-right: 2px;
+}
+
+
+.keepnet-panel {
+  border: 1px solid #8f7b61;
+  background: rgba(255, 255, 255, 0.55);
+  padding: 4px;
+  min-height: 58px;
+  max-height: 84px;
+  overflow: auto;
+}
+
+.keepnet-item {
+  font-size: 11px;
+  padding: 2px 4px;
+  margin-bottom: 2px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.keepnet-item.trophy {
+  border-left: 3px solid #d2952a;
+  font-weight: 700;
 }

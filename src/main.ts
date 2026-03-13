@@ -1,5 +1,7 @@
 import './styles.css';
 
+import { LOCATIONS, type FishSpecies, type LocationData } from './data/fishing-config';
+
 type Screen = 'base' | 'map' | 'fishing';
 type ItemType = 'rod' | 'reel' | 'line' | 'hook' | 'bait';
 type FishingPhase = 'idle' | 'waiting' | 'bite' | 'hooked' | 'landed' | 'escaped' | 'broken';
@@ -20,30 +22,14 @@ interface TackleItem {
   quantity: number;
 }
 
-interface FishSpecies {
-  id: string;
-  name: string;
-  minWeightKg: number;
-  maxWeightKg: number;
-  pullFactor: number;
-  pricePerKg: number;
-  chance: number;
-}
-
-interface LocationData {
-  id: string;
-  name: string;
-  mapX: number;
-  mapY: number;
-  fishes: FishSpecies[];
-}
-
 interface CaughtFish {
   id: string;
   name: string;
   weight: number;
   price: number;
   pullFactor: number;
+  isTrophy: boolean;
+  locationName: string;
 }
 
 interface FishingState {
@@ -68,31 +54,6 @@ const app = appEl;
 const BASE_UI_WIDTH = 1280;
 const BASE_UI_HEIGHT = 960;
 
-const LOCATIONS: LocationData[] = [
-  {
-    id: 'gold_lake',
-    name: 'Золотая рыбка',
-    mapX: 70,
-    mapY: 58,
-    fishes: [
-      { id: 'karas', name: 'Карась', minWeightKg: 0.7, maxWeightKg: 3.8, pullFactor: 0.85, pricePerKg: 170, chance: 44 },
-      { id: 'lesh', name: 'Лещ', minWeightKg: 1.4, maxWeightKg: 5.5, pullFactor: 1.05, pricePerKg: 210, chance: 32 },
-      { id: 'pike', name: 'Щука', minWeightKg: 2.1, maxWeightKg: 8.5, pullFactor: 1.35, pricePerKg: 260, chance: 19 },
-      { id: 'catfish', name: 'Сом', minWeightKg: 4.0, maxWeightKg: 12.0, pullFactor: 1.65, pricePerKg: 330, chance: 5 },
-    ],
-  },
-  {
-    id: 'forest_pond',
-    name: 'Лесной пруд',
-    mapX: 63,
-    mapY: 52,
-    fishes: [
-      { id: 'okun', name: 'Окунь', minWeightKg: 0.3, maxWeightKg: 1.5, pullFactor: 0.75, pricePerKg: 160, chance: 55 },
-      { id: 'plotva', name: 'Плотва', minWeightKg: 0.2, maxWeightKg: 1.2, pullFactor: 0.65, pricePerKg: 140, chance: 45 },
-    ],
-  },
-];
-
 const CATALOG: ReadonlyArray<Omit<TackleItem, 'quantity'>> = [
   { id: 'rod_basic', type: 'rod', name: 'Удилище Basic', loadKg: 6, price: 0 },
   { id: 'rod_pro', type: 'rod', name: 'Удилище Pro', loadKg: 11, price: 900 },
@@ -112,6 +73,7 @@ let rodId = 0;
 let money = 1200;
 let totalFishCaught = 0;
 let currentLocationId = 'gold_lake';
+let keepnet: CaughtFish[] = [];
 
 let inventory: TackleItem[] = [
   { id: 'rod_basic', type: 'rod', name: 'Удилище Basic', loadKg: 6, price: 0, quantity: 1 },
@@ -172,6 +134,17 @@ function getInventoryItem(id: string | null): TackleItem | null {
 
 function getCurrentLocation(): LocationData {
   return LOCATIONS.find((loc) => loc.id === currentLocationId) ?? LOCATIONS[0];
+}
+
+function getKeepnetTotalPrice(): number {
+  return keepnet.reduce((sum, fish) => sum + fish.price, 0);
+}
+
+function sellKeepnet(): void {
+  if (keepnet.length === 0) return;
+  money += getKeepnetTotalPrice();
+  keepnet = [];
+  render();
 }
 
 function getRigStats(): { rodLoad: number; reelLoad: number; finalLoad: number } | null {
@@ -257,6 +230,22 @@ function equipItem(itemId: string): void {
   render();
 }
 
+function createCaughtFish(species: FishSpecies, locationName: string): CaughtFish {
+  const weight = Number((species.minWeightKg + Math.random() * (species.maxWeightKg - species.minWeightKg)).toFixed(2));
+  const isTrophy = weight >= species.trophyWeightKg;
+  const pricePerKg = isTrophy ? species.trophyPricePerKg : species.regularPricePerKg;
+
+  return {
+    id: species.id,
+    name: species.name,
+    weight,
+    pullFactor: species.pullFactor,
+    price: Math.round(weight * pricePerKg),
+    isTrophy,
+    locationName,
+  };
+}
+
 function rollFishForLocation(location: LocationData): CaughtFish {
   const totalChance = location.fishes.reduce((sum, fish) => sum + fish.chance, 0);
   let roll = Math.random() * totalChance;
@@ -270,15 +259,7 @@ function rollFishForLocation(location: LocationData): CaughtFish {
     }
   }
 
-  const weight = Number((selected.minWeightKg + Math.random() * (selected.maxWeightKg - selected.minWeightKg)).toFixed(2));
-
-  return {
-    id: selected.id,
-    name: selected.name,
-    weight,
-    pullFactor: selected.pullFactor,
-    price: Math.round(weight * selected.pricePerKg),
-  };
+  return createCaughtFish(selected, location.name);
 }
 
 function startCasting(x: number, y: number): void {
@@ -310,14 +291,27 @@ function phaseText(phase: FishingPhase): string {
   if (phase === 'waiting') return 'Поплавок в воде';
   if (phase === 'bite') return 'Клёв! Жми SPACE';
   if (phase === 'hooked') return 'Тяни по очереди: G (удилище) → H (катушка)';
-  if (phase === 'landed') return 'Рыба поймана';
+  if (phase === 'landed') return 'Рыба в садке';
   if (phase === 'escaped') return 'Сошла';
   return 'Снасть сломана';
+}
+
+function renderKeepnetList(): string {
+  if (keepnet.length === 0) return '<div class="no-items">Садок пуст</div>';
+
+  return keepnet
+    .slice(-4)
+    .reverse()
+    .map(
+      (fish) => `<div class="keepnet-item ${fish.isTrophy ? 'trophy' : ''}">${fish.name} ${fish.weight.toFixed(2)} кг ${fish.isTrophy ? '(зачетная)' : ''} — ${formatMoney(fish.price)}</div>`
+    )
+    .join('');
 }
 
 function render(): void {
   const rigStats = getRigStats();
   const location = getCurrentLocation();
+  const keepnetTotal = getKeepnetTotalPrice();
 
   app.innerHTML = `
     <div class="viewport-fit">
@@ -347,8 +341,10 @@ function render(): void {
               <h3>Баланс: ${formatMoney(money)}</h3>
               <p>Локация: ${location.name}</p>
               <small>Рыбы поймано: ${totalFishCaught}</small>
+              <small>Садок: ${keepnet.length} шт, ${formatMoney(keepnetTotal)}</small>
               <small>Фаза: ${phaseText(fishing.phase)}</small>
               <small>Удилище: ${rigStats ? `${rigStats.rodLoad.toFixed(1)} кг` : '—'} | Катушка: ${rigStats ? `${rigStats.reelLoad.toFixed(1)} кг` : '—'}</small>
+              <button class="sell-btn" id="sell-keepnet-btn" ${keepnet.length === 0 ? 'disabled' : ''}>Продать садок</button>
             </div>
           </aside>
         </div>
@@ -360,7 +356,13 @@ function render(): void {
           </div>
 
           <div class="inventory">${renderAssemblyPanel(rigStats)}</div>
-          <div class="chat-area">${renderShopPanel()}</div>
+          <div class="chat-area">
+            ${renderShopPanel()}
+            <div class="keepnet-panel">
+              <div class="panel-title">Садок</div>
+              ${renderKeepnetList()}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -379,7 +381,7 @@ function renderBaseScreen(): string {
           <li>купить снасти (внизу справа)</li>
           <li>собрать удочку (внизу по центру)</li>
           <li>путешествие → карта справа</li>
-          <li>система рыб по водоёмам уже заложена</li>
+          <li>рыба идет в садок, продажа вручную</li>
         </ul>
       </div>
     </section>
@@ -415,7 +417,7 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
         <div>${canCast ? 'Клик по воде — закинуть снасть' : 'Собери снасть: удилище+катушка+леска+крючок+наживка'}</div>
         <div>${phaseText(fishing.phase)}</div>
         <div>Локация: ${getCurrentLocation().name}</div>
-        <div>${fishing.fish ? `На крючке: ${fishing.fish.name}, ${fishing.fish.weight.toFixed(2)} кг` : 'Рыба: —'}</div>
+        <div>${fishing.fish ? `На крючке: ${fishing.fish.name}, ${fishing.fish.weight.toFixed(2)} кг ${fishing.fish.isTrophy ? '(зачетная)' : ''}` : 'Рыба: —'}</div>
         <div>Суммарный лимит: ${rigStats ? `${rigStats.finalLoad.toFixed(1)} кг` : '—'}</div>
 
         <div id="fishing-bars" class="fight-bars ${fishing.phase === 'hooked' ? '' : 'hidden'}">
@@ -486,6 +488,10 @@ function bindEvents(): void {
   document.querySelector<HTMLButtonElement>('#go-base-btn')?.addEventListener('click', () => {
     screen = 'base';
     setPhase('idle');
+  });
+
+  document.querySelector<HTMLButtonElement>('#sell-keepnet-btn')?.addEventListener('click', () => {
+    sellKeepnet();
   });
 
   document.querySelector<HTMLButtonElement>('#close-map-btn')?.addEventListener('click', () => {
@@ -607,7 +613,7 @@ function updateFishing(dt: number): void {
 
   if (fishing.catchProgress >= 100) {
     totalFishCaught += 1;
-    money += activeFish.price;
+    keepnet.push(activeFish);
     setPhase('landed', activeFish);
     window.setTimeout(() => setPhase('idle'), 1400);
     return;
