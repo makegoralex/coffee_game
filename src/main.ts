@@ -491,9 +491,10 @@ function renderMapScreen(): string {
 
 function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; finalLoad: number } | null): string {
   const activeRod = rods[0];
+  const location = getCurrentLocation();
 
   return `
-    <section class="screen fishing-screen">
+    <section class="screen fishing-screen" style="--lake-image:url('${location.sceneImage}')">
       <div class="water-overlay" id="water">
         ${activeRod ? `<div class="rod" style="left:${activeRod.castX}%; top:${activeRod.castY}%"><div class="line"></div><div class="stick"></div></div>` : ''}
         ${
@@ -504,10 +505,14 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
       </div>
 
       <div class="tension-widget">
-        <div class="bar-title">Натяжение удилища</div>
-        <div class="bar-track rod"><i id="rod-load-bar" style="width:${Math.min(100, fishing.rodOverload * 70).toFixed(0)}%"></i></div>
-        <div class="bar-title">Натяжение катушки</div>
-        <div class="bar-track reel"><i id="reel-load-bar" style="width:${Math.min(100, fishing.reelOverload * 70).toFixed(0)}%"></i></div>
+        <div class="tension-column">
+          <div class="bar-title">Удилище</div>
+          <div class="bar-track rod"><i id="rod-load-bar" style="width:${Math.min(100, fishing.rodOverload * 70).toFixed(0)}%"></i></div>
+        </div>
+        <div class="tension-column">
+          <div class="bar-title">Катушка</div>
+          <div class="bar-track reel"><i id="reel-load-bar" style="width:${Math.min(100, fishing.reelOverload * 70).toFixed(0)}%"></i></div>
+        </div>
       </div>
 
       ${
