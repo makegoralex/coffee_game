@@ -79,6 +79,10 @@ let rods: Rod[] = [];
 let rodId = 0;
 let money = 1200;
 let totalFishCaught = 0;
+
+const WEEK_DAYS = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'] as const;
+let gameClockMinutes = 2 * 24 * 60 + 22 * 60 + 50;
+let gameClockAccumulator = 0;
 let currentLocationId = 'gold_lake';
 let keepnet: CaughtFish[] = [];
 let activeUtilityPanel: UtilityPanel = 'shop';
@@ -136,6 +140,23 @@ function applyViewportScale(): void {
 
 function formatMoney(value: number): string {
   return `${Math.floor(value).toLocaleString('ru-RU')} руб.`;
+}
+
+function formatGameTime(totalMinutes: number): string {
+  const dayIndex = Math.floor(totalMinutes / (24 * 60)) % WEEK_DAYS.length;
+  const minuteOfDay = ((totalMinutes % (24 * 60)) + (24 * 60)) % (24 * 60);
+  const hours = Math.floor(minuteOfDay / 60).toString().padStart(2, '0');
+  const minutes = (minuteOfDay % 60).toString().padStart(2, '0');
+  return `${hours}:${minutes} ${WEEK_DAYS[dayIndex]}`;
+}
+
+function updateGameClock(dt: number): void {
+  gameClockAccumulator += dt;
+  const stepSeconds = 10;
+  while (gameClockAccumulator >= stepSeconds) {
+    gameClockAccumulator -= stepSeconds;
+    gameClockMinutes += 10;
+  }
 }
 
 function getInventoryByType(type: ItemType): TackleItem[] {
@@ -421,7 +442,7 @@ function render(): void {
     <div class="viewport-fit">
       <div class="game-root wood-bg">
         <header class="top-bar">
-          <div class="money-box">Время: <b>22:50 СР</b> &nbsp;&nbsp; Деньги: <b>${formatMoney(money)}</b></div>
+          <div class="money-box">Время: <b>${formatGameTime(gameClockMinutes)}</b> &nbsp;&nbsp; Деньги: <b>${formatMoney(money)}</b></div>
           <div class="menu-box">SPACE — подсечка | G → H — вываживание</div>
         </header>
 
@@ -719,10 +740,8 @@ function updateFishing(dt: number): void {
   const reelLoadNow = fishBasePull + (hPressed ? 1.3 : 0.08) + (gPressed ? 0.15 : 0);
 
   fishing.currentLoad = (rodLoadNow + reelLoadNow) / 2;
-  const rodBase = Math.min(0.3, activeFish.weight * 0.03);
-  const reelBase = Math.min(0.26, activeFish.weight * 0.027);
-  fishing.rodTension = Math.max(rodBase, Math.min(1, rodLoadNow / Math.max(0.5, rigStats.rodLoad)));
-  fishing.reelTension = Math.max(reelBase, Math.min(1, reelLoadNow / Math.max(0.5, rigStats.reelLoad)));
+  fishing.rodTension = gPressed ? Math.max(0.06, Math.min(1, rodLoadNow / Math.max(0.5, rigStats.rodLoad))) : 0;
+  fishing.reelTension = hPressed ? Math.max(0.06, Math.min(1, reelLoadNow / Math.max(0.5, rigStats.reelLoad))) : 0;
 
   const isAlternatingBoost = (gPressed && fishing.lastPull === 'reel') || (hPressed && fishing.lastPull === 'rod');
   const rodPower = gPressed ? (isAlternatingBoost ? 21 : 11) : -2.2;
@@ -787,6 +806,7 @@ function renderHudOnly(): void {
 function gameLoop(ts: number): void {
   const dt = Math.min((ts - lastTs) / 1000, 0.05);
   lastTs = ts;
+  updateGameClock(dt);
   updateFishing(dt);
   rafId = requestAnimationFrame(gameLoop);
 }

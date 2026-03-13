@@ -298,9 +298,10 @@ body {
   height: 100%;
   border-top: 2px solid #1f252a;
   overflow: hidden;
+  background-color: #232a2f;
   background-image:
     linear-gradient(180deg, rgba(8, 10, 12, 0.12), rgba(8, 12, 16, 0.36)),
-    var(--lake-image);
+    var(--lake-image, radial-gradient(circle at 40% 25%, #535f63 0%, #31393d 35%, #1f272c 100%));
   background-size: cover;
   background-position: center;
 }

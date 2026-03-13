@@ -25,7 +25,7 @@ export const LOCATIONS: LocationData[] = [
     name: 'Золотая рыбка',
     mapX: 70,
     mapY: 58,
-    sceneImage: '/src/assets/locations/soderzhanie-vodoemov.jpg',
+    sceneImage: new URL('../assets/locations/soderzhanie-vodoemov.jpg', import.meta.url).href,
     fishes: [
       { id: 'karas', name: 'Карась', minWeightKg: 0.7, maxWeightKg: 3.8, pullFactor: 0.85, regularPricePerKg: 75, trophyPricePerKg: 210, trophyWeightKg: 2.8, chance: 44 },
       { id: 'lesh', name: 'Лещ', minWeightKg: 1.4, maxWeightKg: 5.5, pullFactor: 1.05, regularPricePerKg: 95, trophyPricePerKg: 260, trophyWeightKg: 4.2, chance: 32 },
