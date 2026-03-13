@@ -191,6 +191,7 @@ async function bootstrap(): Promise<void> {
         <h2>Производство</h2>
         <div class="row"><span class="label">Очередь</span><span class="label" id="queue-size">0</span></div>
         <div class="row"><span class="label">Готовится</span><span class="label" id="brewing-status">—</span></div>
+        <div class="progress-track"><div class="progress-fill" id="brew-progress-fill"></div></div>
         <div class="row"><span class="label">Ждут выдачу</span><span class="label" id="pickup-size">0</span></div>
         <div class="hint" id="next-visitor">Следующий посетитель через 0с</div>
       </section>
@@ -251,6 +252,7 @@ async function bootstrap(): Promise<void> {
           <span class="label" id="assistant-cost">0 ₽</span>
         </div>
         <div class="hint" id="assistant-effect">Автовыдача: выключена</div>
+        <div class="progress-track"><div class="progress-fill" id="assistant-progress-fill"></div></div>
         <button class="secondary-btn" id="assistant-btn">Нанять/улучшить помощника</button>
       </section>
 
@@ -275,8 +277,10 @@ async function bootstrap(): Promise<void> {
   const assistantLevelEl = root.querySelector<HTMLElement>('#assistant-level');
   const assistantCostEl = root.querySelector<HTMLElement>('#assistant-cost');
   const assistantEffectEl = root.querySelector<HTMLElement>('#assistant-effect');
+  const assistantProgressFillEl = root.querySelector<HTMLElement>('#assistant-progress-fill');
   const queueSizeEl = root.querySelector<HTMLElement>('#queue-size');
   const brewingStatusEl = root.querySelector<HTMLElement>('#brewing-status');
+  const brewProgressFillEl = root.querySelector<HTMLElement>('#brew-progress-fill');
   const pickupSizeEl = root.querySelector<HTMLElement>('#pickup-size');
   const readyOrdersEl = root.querySelector<HTMLElement>('#ready-orders');
   const pickupCustomersEl = root.querySelector<HTMLElement>('#pickup-customers');
@@ -287,7 +291,7 @@ async function bootstrap(): Promise<void> {
   const lostCountEl = root.querySelector<HTMLElement>('#lost-count');
   const wrongCountEl = root.querySelector<HTMLElement>('#wrong-count');
 
-  if (!moneyEl || !incomeEl || !ratingEl || !offlineEl || !upgradeBtn || !upgradeCostEl || !equipLevelEl || !resetBtn || !marketingBtn || !assistantBtn || !marketingCostEl || !flowLevelEl || !assistantLevelEl || !assistantCostEl || !assistantEffectEl || !queueSizeEl || !brewingStatusEl || !pickupSizeEl || !readyOrdersEl || !pickupCustomersEl || !serveStatusEl || !serveBtn || !nextVisitorEl || !servedCountEl || !lostCountEl || !wrongCountEl) {
+  if (!moneyEl || !incomeEl || !ratingEl || !offlineEl || !upgradeBtn || !upgradeCostEl || !equipLevelEl || !resetBtn || !marketingBtn || !assistantBtn || !marketingCostEl || !flowLevelEl || !assistantLevelEl || !assistantCostEl || !assistantEffectEl || !assistantProgressFillEl || !queueSizeEl || !brewingStatusEl || !brewProgressFillEl || !pickupSizeEl || !readyOrdersEl || !pickupCustomersEl || !serveStatusEl || !serveBtn || !nextVisitorEl || !servedCountEl || !lostCountEl || !wrongCountEl) {
     throw new Error('Missing UI elements');
   }
 
@@ -307,8 +311,10 @@ async function bootstrap(): Promise<void> {
     assistantLevelEl,
     assistantCostEl,
     assistantEffectEl,
+    assistantProgressFillEl,
     queueSizeEl,
     brewingStatusEl,
+    brewProgressFillEl,
     pickupSizeEl,
     readyOrdersEl,
     pickupCustomersEl,
@@ -395,6 +401,10 @@ async function bootstrap(): Promise<void> {
     ui.brewingStatusEl.textContent = currentState.cafe.activeOrder
       ? `${currentState.cafe.activeOrder.recipeId} (${formatSec(currentState.cafe.activeOrder.progressSec)} / ${formatSec(currentState.cafe.activeOrder.requiredSec)})`
       : '—';
+    const brewProgress = currentState.cafe.activeOrder
+      ? Math.min(100, (currentState.cafe.activeOrder.progressSec / currentState.cafe.activeOrder.requiredSec) * 100)
+      : 0;
+    ui.brewProgressFillEl.style.width = `${brewProgress}%`;
 
     ui.servedCountEl.textContent = String(currentState.cafe.serviceStats.servedCustomers);
     ui.lostCountEl.textContent = String(currentState.cafe.serviceStats.lostCustomers);
@@ -414,6 +424,11 @@ async function bootstrap(): Promise<void> {
     ui.assistantEffectEl.textContent = currentState.cafe.assistantLevel > 0
       ? `Автовыдача: 1 заказ каждые ${Math.max(1, 7 - currentState.cafe.assistantLevel)}с`
       : 'Автовыдача: выключена';
+    const assistantIntervalSec = Math.max(1, 7 - currentState.cafe.assistantLevel);
+    const assistantProgress = currentState.cafe.assistantLevel > 0
+      ? Math.min(100, (currentState.cafe.assistantProgressSec / assistantIntervalSec) * 100)
+      : 0;
+    ui.assistantProgressFillEl.style.width = `${assistantProgress}%`;
 
     renderServeControls();
   }
