@@ -28,7 +28,7 @@
 ## Фоны водоёмов
 
 - Изображения/фоны водоёмов хранятся в `src/assets/locations/`.
-- Привязка водоёма к картинке задаётся полем `sceneImage` в `src/data/fishing-config.ts`.
+- Привязка водоёма к картинке задаётся полем `sceneImage` в `src/data/fishing-config.ts` (для первого водоёма используется `src/assets/locations/soderzhanie-vodoemov (1).jpg`).
 
 ## Где редактировать виды рыб и цены
 

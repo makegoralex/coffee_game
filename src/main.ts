@@ -45,6 +45,8 @@ interface FishingState {
   currentLoad: number;
   rodOverload: number;
   reelOverload: number;
+  rodTension: number;
+  reelTension: number;
   fish: CaughtFish | null;
   lastPull: PullAction;
   floatX: number;
@@ -107,6 +109,8 @@ let fishing: FishingState = {
   currentLoad: 0,
   rodOverload: 0,
   reelOverload: 0,
+  rodTension: 0,
+  reelTension: 0,
   fish: null,
   lastPull: null,
   floatX: 0,
@@ -184,6 +188,8 @@ function resetFightState(): void {
   fishing.currentLoad = 0;
   fishing.rodOverload = 0;
   fishing.reelOverload = 0;
+  fishing.rodTension = 0;
+  fishing.reelTension = 0;
   fishing.lastPull = null;
   fishing.floatX = 0;
   fishing.floatY = 0;
@@ -291,6 +297,8 @@ function startCasting(x: number, y: number): void {
   fishing.fightTimer = 0;
   fishing.rodOverload = 0;
   fishing.reelOverload = 0;
+  fishing.rodTension = 0;
+  fishing.reelTension = 0;
   fishing.currentLoad = 0;
   fishing.lastPull = null;
 
@@ -494,7 +502,7 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
   const location = getCurrentLocation();
 
   return `
-    <section class="screen fishing-screen" style="--lake-image:url('${location.sceneImage}')">
+    <section class="screen fishing-screen" style="${location.sceneImage ? `--lake-image:url('${location.sceneImage}')` : ''}">
       <div class="water-overlay" id="water">
         ${activeRod ? `<div class="rod" style="left:${activeRod.castX}%; top:${activeRod.castY}%"><div class="line"></div><div class="stick"></div></div>` : ''}
         ${
@@ -507,11 +515,11 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
       <div class="tension-widget">
         <div class="tension-column">
           <div class="bar-title">Удилище</div>
-          <div class="bar-track rod"><i id="rod-load-bar" style="width:${Math.min(100, fishing.rodOverload * 70).toFixed(0)}%"></i></div>
+          <div class="bar-track rod"><i id="rod-load-bar" style="width:${Math.max(0, Math.min(100, fishing.rodTension * 100)).toFixed(0)}%"></i></div>
         </div>
         <div class="tension-column">
           <div class="bar-title">Катушка</div>
-          <div class="bar-track reel"><i id="reel-load-bar" style="width:${Math.min(100, fishing.reelOverload * 70).toFixed(0)}%"></i></div>
+          <div class="bar-track reel"><i id="reel-load-bar" style="width:${Math.max(0, Math.min(100, fishing.reelTension * 100)).toFixed(0)}%"></i></div>
         </div>
       </div>
 
@@ -655,6 +663,9 @@ function updateFishing(dt: number): void {
 
   if (fishing.phase === 'waiting') {
     fishing.waitTimer -= dt;
+    fishing.fightTimer += dt;
+    fishing.rodTension = 0.08 + Math.abs(Math.sin(fishing.fightTimer * 1.9)) * 0.06;
+    fishing.reelTension = 0.06 + Math.abs(Math.cos(fishing.fightTimer * 1.4)) * 0.05;
     if (fishing.waitTimer <= 0 && fishing.fish) {
       fishing.biteTimer = 1.8;
       fishing.biteType = Math.random() > 0.5 ? 'sink' : 'run';
@@ -662,6 +673,7 @@ function updateFishing(dt: number): void {
       playBiteSignal();
       setPhase('bite', fishing.fish);
     }
+    renderHudOnly();
     return;
   }
 
@@ -669,6 +681,8 @@ function updateFishing(dt: number): void {
     fishing.fightTimer += dt;
     fishing.biteTimer -= dt;
     updateBiteAnimation(dt);
+    fishing.rodTension = 0.15 + Math.abs(Math.sin(fishing.fightTimer * 8.2)) * 0.24;
+    fishing.reelTension = 0.12 + Math.abs(Math.cos(fishing.fightTimer * 9.1)) * 0.2;
     if (fishing.biteTimer <= 0) {
       setPhase('escaped');
       window.setTimeout(() => setPhase('idle'), 1200);
@@ -695,6 +709,8 @@ function updateFishing(dt: number): void {
   const reelLoadNow = fishBasePull + (hPressed ? 1.3 : 0.08) + (gPressed ? 0.15 : 0);
 
   fishing.currentLoad = (rodLoadNow + reelLoadNow) / 2;
+  fishing.rodTension = Math.max(0.07, Math.min(1, rodLoadNow / Math.max(0.5, rigStats.rodLoad)));
+  fishing.reelTension = Math.max(0.07, Math.min(1, reelLoadNow / Math.max(0.5, rigStats.reelLoad)));
 
   const isAlternatingBoost = (gPressed && fishing.lastPull === 'reel') || (hPressed && fishing.lastPull === 'rod');
   const rodPower = gPressed ? (isAlternatingBoost ? 21 : 11) : -2.2;
@@ -746,8 +762,8 @@ function renderHudOnly(): void {
   const reelLoadBar = document.querySelector<HTMLDivElement>('#reel-load-bar');
   const bobber = document.querySelector<HTMLDivElement>('#bobber');
 
-  if (rodLoadBar) rodLoadBar.style.width = `${Math.min(100, fishing.rodOverload * 70).toFixed(0)}%`;
-  if (reelLoadBar) reelLoadBar.style.width = `${Math.min(100, fishing.reelOverload * 70).toFixed(0)}%`;
+  if (rodLoadBar) rodLoadBar.style.width = `${Math.max(0, Math.min(100, fishing.rodTension * 100)).toFixed(0)}%`;
+  if (reelLoadBar) reelLoadBar.style.width = `${Math.max(0, Math.min(100, fishing.reelTension * 100)).toFixed(0)}%`;
 
   if (bobber) {
     bobber.style.left = `${fishing.floatX}%`;
