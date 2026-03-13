@@ -313,6 +313,7 @@ body {
   bottom: 0;
   height: 53%;
   background: linear-gradient(180deg, rgba(20, 49, 64, 0.08), rgba(10, 21, 29, 0.46));
+  z-index: 1;
 }
 
 
@@ -385,12 +386,11 @@ body {
 
 .rod {
   position: absolute;
-  left: 14%;
   top: 84%;
   width: 30px;
   height: 370px;
   transform: translate(-50%, -6%);
-  z-index: 2;
+  z-index: 3;
   pointer-events: none;
 }
 
@@ -401,14 +401,19 @@ body {
   background: linear-gradient(#fff 0 45%, #d61912 45% 100%);
   border-radius: 6px;
   border: 1px solid #1d1d1d;
-  clip-path: inset(calc(var(--bobber-cut) * 80%) 0 0 0);
+  clip-path: inset(calc(var(--bobber-cut) * 100%) 0 0 0);
+  opacity: calc(1 - var(--bobber-cut));
   transition: transform 0.15s ease;
 }
 
 .bobber {
   position: absolute;
   transform: translate(-50%, -50%);
-  z-index: 3;
+  z-index: 4;
+}
+
+.bobber.bite-sink {
+  transition: transform 0.08s linear;
 }
 
 .bobber.run {

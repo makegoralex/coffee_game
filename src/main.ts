@@ -508,10 +508,10 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
   return `
     <section class="screen fishing-screen" style="${location.sceneImage ? `--lake-image:url('${location.sceneImage}')` : ''}">
       <div class="water-overlay" id="water">
-        ${activeRod ? `<div class="rod"><div class="line"></div><div class="stick"></div></div>` : ''}
+        ${activeRod ? `<div class="rod" style="left:${activeRod.castX}%;"><div class="line"></div><div class="stick"></div></div>` : ''}
         ${
           activeRod
-            ? `<div id="bobber" class="float bobber ${fishing.phase === 'bite' && fishing.biteType === 'run' ? 'run' : ''} ${fishing.phase === 'hooked' && fishing.biteType === 'run' ? 'run hooked-run' : ''} ${fishing.phase === 'hooked' && fishing.biteType === 'sink' ? 'dot' : ''}" style="left:${fishing.floatX}%; top:${fishing.floatY}%; --bobber-cut:${fishing.bobberCut.toFixed(2)}"></div>`
+            ? `<div id="bobber" class="float bobber ${fishing.phase === 'bite' && fishing.biteType === 'run' ? 'run' : ''} ${fishing.phase === 'bite' && fishing.biteType === 'sink' ? 'bite-sink' : ''} ${fishing.phase === 'hooked' && fishing.biteType === 'run' ? 'run hooked-run' : ''} ${fishing.phase === 'hooked' && fishing.biteType === 'sink' ? 'dot' : ''}" style="left:${fishing.floatX}%; top:${fishing.floatY}%; --bobber-cut:${fishing.bobberCut.toFixed(2)}"></div>`
             : ''
         }
       </div>
@@ -656,7 +656,7 @@ function updateBiteAnimation(): void {
     const deep = Math.max(0, 1.8 - fishing.biteTimer) * 0.48;
     fishing.floatX = activeRod.castX + shake;
     fishing.floatY = Math.min(84, activeRod.castY + deep);
-    fishing.bobberCut = Math.max(0.25, Math.min(0.9, 0.35 + pulse * 0.5 + deep * 0.16));
+    fishing.bobberCut = Math.max(0.35, Math.min(1, 0.45 + pulse * 0.46 + deep * 0.24));
     return;
   }
 
@@ -801,6 +801,12 @@ window.addEventListener('keydown', (event) => {
 
   if (event.code === 'KeyG') gPressed = true;
   if (event.code === 'KeyH') hPressed = true;
+
+  if (event.code === 'KeyM') {
+    screen = screen === 'map' ? 'base' : 'map';
+    render();
+    return;
+  }
 
   if (event.code === 'Space' && fishing.phase === 'bite') {
     event.preventDefault();
