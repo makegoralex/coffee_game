@@ -10,7 +10,16 @@ const RECIPES: Record<RecipeId, { brewSec: number; priceMultiplier: number }> = 
   latte: { brewSec: 6.2, priceMultiplier: 1.25 },
 };
 
+
 const RECIPE_IDS: RecipeId[] = ['espresso', 'americano', 'latte'];
+
+function createRuntimeId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `id_${Date.now()}_${Math.floor(Math.random() * 1_000_000_000)}`;
+}
 
 export class GameApp {
   private readonly economy = new EconomySystem();
@@ -38,7 +47,7 @@ export class GameApp {
 
   private createCustomer(): WaitingCustomer {
     return {
-      id: crypto.randomUUID(),
+      id: createRuntimeId(),
       recipeId: this.pickRecipeId(),
       patienceSec: 10 + Math.random() * 8,
       waitedSec: 0,
@@ -78,7 +87,7 @@ export class GameApp {
     if (!this.state.cafe.activeOrder && this.state.cafe.queueCustomers.length > 0) {
       const customer = this.state.cafe.queueCustomers.shift();
       if (customer) {
-        const orderId = crypto.randomUUID();
+        const orderId = createRuntimeId();
         const recipeId = customer.recipeId ?? 'americano';
         this.state.cafe.activeOrder = {
           orderId,
@@ -114,7 +123,7 @@ export class GameApp {
     }
   }
 
-  public serveReadyOrder(orderId: string): boolean {
+  public serveReadyOrder(orderId: string, targetCustomerId?: string): boolean {
     if (this.state.cafe.readyOrders.length <= 0 || this.state.cafe.pickupQueueCustomerIds.length <= 0) {
       return false;
     }
@@ -124,13 +133,18 @@ export class GameApp {
       return false;
     }
 
+    const expectedCustomerId = targetCustomerId ?? this.state.cafe.pickupQueueCustomerIds[0];
+    const pickupIndex = this.state.cafe.pickupQueueCustomerIds.findIndex((id) => id === expectedCustomerId);
+    if (pickupIndex < 0) {
+      return false;
+    }
+
     const order = this.state.cafe.readyOrders[orderIndex];
-    const targetCustomerId = this.state.cafe.pickupQueueCustomerIds[0];
 
     this.state.cafe.readyOrders.splice(orderIndex, 1);
-    this.state.cafe.pickupQueueCustomerIds.shift();
+    this.state.cafe.pickupQueueCustomerIds.splice(pickupIndex, 1);
 
-    if (order.customerId === targetCustomerId) {
+    if (order.customerId === expectedCustomerId) {
       this.state.player.wallet.soft += order.price;
       this.state.cafe.serviceStats.servedCustomers += 1;
       this.state.cafe.rating = this.clampRating(this.state.cafe.rating + 0.7);
@@ -145,10 +159,10 @@ export class GameApp {
     this.eventBus.emit({
       type: 'order.misserved',
       orderId: order.orderId,
-      expectedCustomerId: targetCustomerId,
+      expectedCustomerId,
       actualCustomerId: order.customerId,
     });
-    this.eventBus.emit({ type: 'customer.lost', customerId: targetCustomerId, reason: 'left' });
+    this.eventBus.emit({ type: 'customer.lost', customerId: expectedCustomerId, reason: 'left' });
 
     return false;
   }
@@ -184,7 +198,12 @@ export class GameApp {
     return estimatedOrders * this.state.cafe.manualSaleIncome * 0.35;
   }
 
-  public applyOfflineIncome(_amount: number, nowUtcMs: number): void {
+  public applyOfflineIncome(amount: number, nowUtcMs: number): void {
+    if (amount > 0) {
+      this.state.player.wallet.soft += amount;
+      this.eventBus.emit({ type: 'economy.moneyEarned', amount });
+    }
+
     this.state.timing.lastActiveTimestampUtcMs = nowUtcMs;
   }
 
@@ -295,7 +314,7 @@ export class GameApp {
     this.state.cafe.readyOrderIds.push(order.id);
   }
 
-  private serveReadyOrder(): void {
+  private serveReadyOrderLegacy(): void {
     const orderId = this.state.cafe.readyOrderIds.shift();
     if (!orderId) {
       return;
