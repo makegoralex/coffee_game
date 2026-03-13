@@ -7,6 +7,7 @@ type ItemType = 'rod' | 'reel' | 'line' | 'hook' | 'bait';
 type FishingPhase = 'idle' | 'waiting' | 'bite' | 'hooked' | 'landed' | 'escaped' | 'broken';
 type PullAction = 'rod' | 'reel' | null;
 type UtilityPanel = 'shop' | 'keepnet';
+type BiteType = 'sink' | 'run';
 
 interface Rod {
   id: number;
@@ -36,6 +37,8 @@ interface CaughtFish {
 interface FishingState {
   phase: FishingPhase;
   biteTimer: number;
+  biteType: BiteType;
+  biteDirection: 1 | -1;
   waitTimer: number;
   fightTimer: number;
   catchProgress: number;
@@ -96,6 +99,8 @@ let equipped: Record<ItemType, string | null> = {
 let fishing: FishingState = {
   phase: 'idle',
   biteTimer: 0,
+  biteType: 'sink',
+  biteDirection: 1,
   waitTimer: 0,
   fightTimer: 0,
   catchProgress: 0,
@@ -112,6 +117,8 @@ let gPressed = false;
 let hPressed = false;
 let rafId = 0;
 let lastTs = performance.now();
+let debugVisible = false;
+let audioContext: AudioContext | null = null;
 
 function applyViewportScale(): void {
   const viewportFit = document.querySelector<HTMLDivElement>('.viewport-fit');
@@ -169,6 +176,8 @@ function isRodReady(): boolean {
 
 function resetFightState(): void {
   fishing.biteTimer = 0;
+  fishing.biteType = 'sink';
+  fishing.biteDirection = 1;
   fishing.waitTimer = 0;
   fishing.fightTimer = 0;
   fishing.catchProgress = 0;
@@ -288,6 +297,33 @@ function startCasting(x: number, y: number): void {
   setPhase('waiting');
 }
 
+function playBiteSignal(): void {
+  try {
+    if (!audioContext) {
+      audioContext = new AudioContext();
+    }
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.type = 'triangle';
+    oscillator.frequency.value = 880;
+    gainNode.gain.value = 0.0001;
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    const now = audioContext.currentTime;
+    gainNode.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.23);
+  } catch {
+    // ignore audio errors in restricted environments
+  }
+}
+
 function phaseText(phase: FishingPhase): string {
   if (phase === 'idle') return 'Ожидание';
   if (phase === 'waiting') return 'Поплавок в воде';
@@ -398,7 +434,6 @@ function render(): void {
               <p>Локация: ${location.name}</p>
               <small>Рыбы поймано: ${totalFishCaught}</small>
               <small>Садок: ${keepnet.length} шт, ${formatMoney(keepnetTotal)}</small>
-              <small>Фаза: ${phaseText(fishing.phase)}</small>
               <small>Удилище: ${rigStats ? `${rigStats.rodLoad.toFixed(1)} кг` : '—'} | Катушка: ${rigStats ? `${rigStats.reelLoad.toFixed(1)} кг` : '—'}</small>
               <button class="sell-btn" id="sell-keepnet-btn" ${keepnet.length === 0 ? 'disabled' : ''}>Продать садок</button>
             </div>
@@ -455,32 +490,31 @@ function renderMapScreen(): string {
 }
 
 function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; finalLoad: number } | null): string {
-  const canCast = isRodReady() && fishing.phase === 'idle';
   const activeRod = rods[0];
 
   return `
     <section class="screen fishing-screen">
       <div class="water-overlay" id="water">
         ${activeRod ? `<div class="rod" style="left:${activeRod.castX}%; top:${activeRod.castY}%"><div class="line"></div><div class="stick"></div></div>` : ''}
-        ${activeRod ? `<div id="bobber" class="float bobber ${fishing.phase === 'bite' || fishing.phase === 'hooked' ? 'underwater' : ''}" style="left:${fishing.floatX}%; top:${fishing.floatY}%"></div>` : ''}
+        ${
+          activeRod
+            ? `<div id="bobber" class="float bobber ${fishing.phase === 'bite' || fishing.phase === 'hooked' ? 'underwater' : ''} ${fishing.phase === 'bite' && fishing.biteType === 'run' ? 'run' : ''}" style="left:${fishing.floatX}%; top:${fishing.floatY}%"></div>`
+            : ''
+        }
       </div>
 
-      <div class="fishing-help">
-        <div>${canCast ? 'Клик по воде — закинуть снасть' : 'Собери снасть: удилище+катушка+леска+крючок+наживка'}</div>
-        <div>${phaseText(fishing.phase)}</div>
-        <div>Локация: ${getCurrentLocation().name}</div>
-        <div>${fishing.fish ? `На крючке: ${fishing.fish.name}, ${fishing.fish.weight.toFixed(2)} кг ${fishing.fish.isTrophy ? '(зачетная)' : ''}` : 'Рыба: —'}</div>
-        <div>Суммарный лимит: ${rigStats ? `${rigStats.finalLoad.toFixed(1)} кг` : '—'}</div>
-
-        <div id="fishing-bars" class="fight-bars ${fishing.phase === 'hooked' ? '' : 'hidden'}">
-          <span>Прогресс вываживания</span>
-          <div class="bar-track"><i id="progress-bar" style="width:${Math.min(100, fishing.catchProgress).toFixed(0)}%"></i></div>
-          <span>Нагрузка удилища (G)</span>
-          <div class="bar-track rod"><i id="rod-load-bar" style="width:${Math.min(100, fishing.rodOverload * 70).toFixed(0)}%"></i></div>
-          <span>Нагрузка катушки (H)</span>
-          <div class="bar-track reel"><i id="reel-load-bar" style="width:${Math.min(100, fishing.reelOverload * 70).toFixed(0)}%"></i></div>
-        </div>
+      <div class="tension-widget">
+        <div class="bar-title">Натяжение удилища</div>
+        <div class="bar-track rod"><i id="rod-load-bar" style="width:${Math.min(100, fishing.rodOverload * 70).toFixed(0)}%"></i></div>
+        <div class="bar-title">Натяжение катушки</div>
+        <div class="bar-track reel"><i id="reel-load-bar" style="width:${Math.min(100, fishing.reelOverload * 70).toFixed(0)}%"></i></div>
       </div>
+
+      ${
+        debugVisible
+          ? `<div class="debug-panel">phase: ${phaseText(fishing.phase)}<br/>fish: ${fishing.fish ? `${fishing.fish.name} ${fishing.fish.weight.toFixed(2)}кг` : '—'}<br/>progress: ${fishing.catchProgress.toFixed(1)}%</div>`
+          : ''
+      }
     </section>
   `;
 }
@@ -593,6 +627,24 @@ function updateFloatPosition(): void {
   fishing.floatX = Math.max(8, Math.min(92, activeRod.castX + sideDrift));
 }
 
+function updateBiteAnimation(dt: number): void {
+  const activeRod = rods[0];
+  if (!activeRod || fishing.phase !== 'bite') return;
+
+  if (fishing.biteType === 'sink') {
+    const shake = Math.sin(fishing.fightTimer * 36) * 0.5;
+    const deep = Math.max(0, 1.8 - fishing.biteTimer) * 1.1;
+    fishing.floatX = activeRod.castX + shake;
+    fishing.floatY = Math.min(84, activeRod.castY + 0.7 + deep);
+    return;
+  }
+
+  const runProgress = Math.max(0, 1.8 - fishing.biteTimer);
+  const side = fishing.biteDirection * (runProgress * 9 + Math.sin(fishing.fightTimer * 18) * 0.6);
+  fishing.floatX = Math.max(6, Math.min(94, activeRod.castX + side));
+  fishing.floatY = Math.max(16, Math.min(82, activeRod.castY - 0.2 + Math.sin(fishing.fightTimer * 10) * 0.3));
+}
+
 function updateFishing(dt: number): void {
   if (screen !== 'fishing') return;
 
@@ -600,17 +652,23 @@ function updateFishing(dt: number): void {
     fishing.waitTimer -= dt;
     if (fishing.waitTimer <= 0 && fishing.fish) {
       fishing.biteTimer = 1.8;
+      fishing.biteType = Math.random() > 0.5 ? 'sink' : 'run';
+      fishing.biteDirection = Math.random() > 0.5 ? 1 : -1;
+      playBiteSignal();
       setPhase('bite', fishing.fish);
     }
     return;
   }
 
   if (fishing.phase === 'bite') {
+    fishing.fightTimer += dt;
     fishing.biteTimer -= dt;
+    updateBiteAnimation(dt);
     if (fishing.biteTimer <= 0) {
       setPhase('escaped');
       window.setTimeout(() => setPhase('idle'), 1200);
     }
+    renderHudOnly();
     return;
   }
 
@@ -679,12 +737,10 @@ function renderHudOnly(): void {
   const depthValue = document.querySelector<HTMLDivElement>('.depth-value');
   if (depthValue) depthValue.textContent = `${fishing.currentLoad.toFixed(2)} кг`;
 
-  const progressBar = document.querySelector<HTMLDivElement>('#progress-bar');
   const rodLoadBar = document.querySelector<HTMLDivElement>('#rod-load-bar');
   const reelLoadBar = document.querySelector<HTMLDivElement>('#reel-load-bar');
   const bobber = document.querySelector<HTMLDivElement>('#bobber');
 
-  if (progressBar) progressBar.style.width = `${Math.min(100, fishing.catchProgress).toFixed(0)}%`;
   if (rodLoadBar) rodLoadBar.style.width = `${Math.min(100, fishing.rodOverload * 70).toFixed(0)}%`;
   if (reelLoadBar) reelLoadBar.style.width = `${Math.min(100, fishing.reelOverload * 70).toFixed(0)}%`;
 
@@ -703,6 +759,12 @@ function gameLoop(ts: number): void {
 
 window.addEventListener('resize', applyViewportScale);
 window.addEventListener('keydown', (event) => {
+  if (event.code === 'F8') {
+    debugVisible = !debugVisible;
+    render();
+    return;
+  }
+
   if (event.code === 'KeyG') gPressed = true;
   if (event.code === 'KeyH') hPressed = true;
 

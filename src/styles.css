@@ -312,24 +312,35 @@ body {
   background: linear-gradient(180deg, rgba(35, 63, 83, 0.4), rgba(18, 34, 44, 0.95));
 }
 
-.fishing-help {
+
+.tension-widget {
   position: absolute;
-  left: 12px;
-  top: 12px;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.52);
+  left: 14px;
+  bottom: 14px;
+  width: 320px;
+  background: rgba(0, 0, 0, 0.58);
   border: 1px solid #946a4a;
-  font-size: 18px;
-  padding: 10px;
-  min-width: 510px;
+  color: #fff;
+  padding: 8px;
+  z-index: 5;
 }
 
-.fight-bars {
-  margin-top: 8px;
+.bar-title {
+  font-size: 12px;
+  margin-bottom: 2px;
 }
 
-.fight-bars.hidden {
-  display: none;
+.debug-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.66);
+  border: 1px dashed #d4a678;
+  color: #f4d6b5;
+  font-size: 12px;
+  line-height: 1.35;
+  padding: 8px;
+  z-index: 6;
 }
 
 .bar-track {
@@ -378,8 +389,19 @@ body {
   z-index: 3;
 }
 
-.float.underwater {
-  transform: translateY(10px);
+.bobber.underwater {
+  transform: translate(-50%, -28%);
+}
+
+.bobber.run {
+  width: 20px;
+  height: 8px;
+  border-radius: 12px;
+  transform: translate(-50%, -50%) rotate(-14deg);
+}
+
+.bobber.run.underwater {
+  transform: translate(-50%, -36%) rotate(-14deg);
 }
 
 .line {
