@@ -182,9 +182,18 @@ async function bootstrap(): Promise<void> {
       <section class="card cafe-scene-card">
         <h2>Зал кофейни</h2>
         <div class="cafe-scene" id="cafe-scene">
-          <div class="scene-zone machine-zone">☕ Кухня</div>
-          <div class="scene-zone counter-zone">🧾 Выдача</div>
-          <div class="scene-zone hall-zone">🪑 Зал</div>
+          <div class="scene-bg-grid"></div>
+          <div class="scene-counter">☕ Барная зона</div>
+          <div class="scene-machine">🛠️ Кофе-станция</div>
+          <div class="scene-entrance">🚪 Вход</div>
+
+          <div class="scene-table t1"><span>🍽️</span></div>
+          <div class="scene-table t2"><span>🍽️</span></div>
+          <div class="scene-table t3"><span>🍽️</span></div>
+          <div class="scene-table t4"><span>🍽️</span></div>
+          <div class="scene-plant p1">🪴</div>
+          <div class="scene-plant p2">🌴</div>
+
           <div class="visitors-layer" id="visitors-layer"></div>
           <div class="barista" id="barista">🧑‍🍳</div>
         </div>
@@ -358,35 +367,47 @@ async function bootstrap(): Promise<void> {
   const renderCafeScene = (): void => {
     const currentState = app.getState();
 
-    const hallVisitors = currentState.cafe.queueCustomers.slice(0, 6);
+    const hallVisitors = currentState.cafe.queueCustomers.slice(0, 8);
     const pickupVisitors = currentState.cafe.pickupQueueCustomerIds.slice(0, 6);
 
     const hallMarkup = hallVisitors
-      .map((customer, index) => `<div class="scene-visitor hall" style="left: ${10 + index * 11}%" title="Ожидает: ${customer.recipeId ?? 'americano'}">🧍</div>`)
+      .map((customer, index) => {
+        const mood = customer.waitedSec / Math.max(1, customer.patienceSec) > 0.65 ? '😠' : '🙂';
+        const row = Math.floor(index / 4);
+        const col = index % 4;
+        const left = 12 + col * 15 + (row % 2) * 2;
+        const bottom = 20 + row * 26;
+        return `<div class="scene-visitor hall" style="left: ${left}%; bottom: ${bottom}px" title="Ждёт ${customer.recipeId ?? 'americano'}"><span class="visitor-body">🧍</span><span class="visitor-mood">${mood}</span></div>`;
+      })
       .join('');
+
     const pickupMarkup = pickupVisitors
       .map((customerId, index) => {
         const selectedClass = selectedCustomerId === customerId ? ' selected' : '';
-        return `<div class="scene-visitor pickup${selectedClass}" style="left: ${62 + index * 6}%">🧍</div>`;
+        return `<div class="scene-visitor pickup${selectedClass}" style="left: ${67 + index * 5}%" title="Очередь выдачи"><span class="visitor-body">🧍</span><span class="visitor-mood">☕</span></div>`;
       })
       .join('');
 
     ui.visitorsLayerEl.innerHTML = hallMarkup + pickupMarkup;
 
-    let baristaX = 30;
-    let machineState = 'Бариста готовит рабочее место';
+    let baristaX = 28;
+    let baristaY = 128;
+    let machineState = 'Бариста ждёт следующего заказа';
 
     if (currentState.cafe.activeOrder) {
       const progress = Math.min(1, currentState.cafe.activeOrder.progressSec / currentState.cafe.activeOrder.requiredSec);
-      baristaX = 34 + progress * 38;
+      baristaX = 34 + progress * 28;
+      baristaY = 124 - progress * 12;
       machineState = `Готовим ${currentState.cafe.activeOrder.recipeId}`;
     } else if (currentState.cafe.pickupQueueCustomerIds.length > 0) {
-      baristaX = 78;
-      machineState = 'Выдача заказов у стойки';
+      baristaX = 76;
+      baristaY = 92;
+      machineState = 'Бариста выдаёт заказы на стойке';
     }
 
     ui.baristaEl.style.left = `${baristaX}%`;
-    ui.machineStateEl.textContent = machineState;
+    ui.baristaEl.style.bottom = `${baristaY}px`;
+    ui.machineStateEl.textContent = `${machineState} · В зале: ${hallVisitors.length} · На выдаче: ${pickupVisitors.length}`;
   };
 
   const renderServeControls = (): void => {
