@@ -107,6 +107,8 @@ export interface CafeState {
   activeOrder: ActiveOrder | null;
   pickupQueueCustomerIds: string[];
   readyOrders: ReadyOrder[];
+  assistantLevel: number;
+  assistantProgressSec: number;
 
   rating: number;
   serviceStats: ServiceStats;
