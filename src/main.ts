@@ -10,13 +10,28 @@ import type { GameState, ReadyOrder, WaitingCustomer } from '@shared/types/state
 const SAVE_KEY = 'coffee-game-save-v1';
 const MAX_OFFLINE_SECONDS = 60 * 60 * 8;
 
+let runtimeIdCounter = 0;
+
+function createRuntimeId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  runtimeIdCounter += 1;
+  return `id_${Date.now()}_${runtimeIdCounter}`;
+}
+
+function formatId(id: string): string {
+  return id.length > 8 ? id.slice(-8) : id;
+}
+
 function toFiniteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
 function sanitizeCustomer(raw: Partial<WaitingCustomer>): WaitingCustomer {
   return {
-    id: typeof raw.id === 'string' ? raw.id : crypto.randomUUID(),
+    id: typeof raw.id === 'string' ? raw.id : createRuntimeId(),
     recipeId: raw.recipeId === 'espresso' || raw.recipeId === 'americano' || raw.recipeId === 'latte' ? raw.recipeId : 'americano',
     patienceSec: Math.max(3, toFiniteNumber(raw.patienceSec, 12)),
     waitedSec: Math.max(0, toFiniteNumber(raw.waitedSec, 0)),
@@ -29,8 +44,8 @@ function sanitizeCustomer(raw: Partial<WaitingCustomer>): WaitingCustomer {
 
 function sanitizeReadyOrder(raw: Partial<ReadyOrder>): ReadyOrder {
   return {
-    orderId: typeof raw.orderId === 'string' ? raw.orderId : crypto.randomUUID(),
-    customerId: typeof raw.customerId === 'string' ? raw.customerId : crypto.randomUUID(),
+    orderId: typeof raw.orderId === 'string' ? raw.orderId : createRuntimeId(),
+    customerId: typeof raw.customerId === 'string' ? raw.customerId : createRuntimeId(),
     recipeId: raw.recipeId === 'espresso' || raw.recipeId === 'americano' || raw.recipeId === 'latte' ? raw.recipeId : 'americano',
     price: Math.max(1, toFiniteNumber(raw.price, 5)),
   };
@@ -65,8 +80,8 @@ function sanitizeState(raw: GameState): GameState {
       queueCustomers: Array.isArray(raw.cafe?.queueCustomers) ? raw.cafe.queueCustomers.map((customer) => sanitizeCustomer(customer)) : [],
       activeOrder: raw.cafe?.activeOrder
         ? {
-            orderId: typeof raw.cafe.activeOrder.orderId === 'string' ? raw.cafe.activeOrder.orderId : crypto.randomUUID(),
-            customerId: typeof raw.cafe.activeOrder.customerId === 'string' ? raw.cafe.activeOrder.customerId : crypto.randomUUID(),
+            orderId: typeof raw.cafe.activeOrder.orderId === 'string' ? raw.cafe.activeOrder.orderId : createRuntimeId(),
+            customerId: typeof raw.cafe.activeOrder.customerId === 'string' ? raw.cafe.activeOrder.customerId : createRuntimeId(),
             recipeId:
               raw.cafe.activeOrder.recipeId === 'espresso' || raw.cafe.activeOrder.recipeId === 'americano' || raw.cafe.activeOrder.recipeId === 'latte'
                 ? raw.cafe.activeOrder.recipeId
@@ -99,8 +114,8 @@ function sanitizeState(raw: GameState): GameState {
           : { customerIds: [], maxSize: 8 },
       activeOrders: Array.isArray(raw.cafe?.activeOrders)
         ? raw.cafe.activeOrders.map((order) => ({
-            id: typeof order.id === 'string' ? order.id : crypto.randomUUID(),
-            customerId: typeof order.customerId === 'string' ? order.customerId : crypto.randomUUID(),
+            id: typeof order.id === 'string' ? order.id : createRuntimeId(),
+            customerId: typeof order.customerId === 'string' ? order.customerId : createRuntimeId(),
             recipeId: typeof order.recipeId === 'string' ? order.recipeId : 'americano',
             progressSec: Math.max(0, toFiniteNumber(order.progressSec, 0)),
             remainingBrewSec: Math.max(0, toFiniteNumber(order.remainingBrewSec, 0)),
@@ -179,8 +194,14 @@ async function bootstrap(): Promise<void> {
       </section>
 
       <section class="card">
-        <h2>Готовые заказы</h2>
+        <h2>Окно выдачи (схема)</h2>
+        <div class="hint">1) Выбери клиента 2) Выбери стакан 3) Нажми «Выдать выбранное».</div>
+        <div class="hint" id="serve-status">Клиент: — · Заказ: —</div>
+        <div class="label">Клиенты на выдаче</div>
+        <div id="pickup-customers" class="ready-orders"></div>
+        <div class="label">Готовые стаканы</div>
         <div id="ready-orders" class="ready-orders"></div>
+        <button class="primary-btn" id="serve-btn">Выдать выбранное</button>
         <div class="hint">Можно выдать не тот заказ — это понижает рейтинг.</div>
       </section>
 
@@ -222,12 +243,15 @@ async function bootstrap(): Promise<void> {
   const brewingStatusEl = root.querySelector<HTMLElement>('#brewing-status');
   const pickupSizeEl = root.querySelector<HTMLElement>('#pickup-size');
   const readyOrdersEl = root.querySelector<HTMLElement>('#ready-orders');
+  const pickupCustomersEl = root.querySelector<HTMLElement>('#pickup-customers');
+  const serveStatusEl = root.querySelector<HTMLElement>('#serve-status');
+  const serveBtn = root.querySelector<HTMLButtonElement>('#serve-btn');
   const nextVisitorEl = root.querySelector<HTMLElement>('#next-visitor');
   const servedCountEl = root.querySelector<HTMLElement>('#served-count');
   const lostCountEl = root.querySelector<HTMLElement>('#lost-count');
   const wrongCountEl = root.querySelector<HTMLElement>('#wrong-count');
 
-  if (!moneyEl || !incomeEl || !ratingEl || !offlineEl || !upgradeBtn || !upgradeCostEl || !equipLevelEl || !resetBtn || !queueSizeEl || !brewingStatusEl || !pickupSizeEl || !readyOrdersEl || !nextVisitorEl || !servedCountEl || !lostCountEl || !wrongCountEl) {
+  if (!moneyEl || !incomeEl || !ratingEl || !offlineEl || !upgradeBtn || !upgradeCostEl || !equipLevelEl || !resetBtn || !queueSizeEl || !brewingStatusEl || !pickupSizeEl || !readyOrdersEl || !pickupCustomersEl || !serveStatusEl || !serveBtn || !nextVisitorEl || !servedCountEl || !lostCountEl || !wrongCountEl) {
     throw new Error('Missing UI elements');
   }
 
@@ -244,6 +268,9 @@ async function bootstrap(): Promise<void> {
     brewingStatusEl,
     pickupSizeEl,
     readyOrdersEl,
+    pickupCustomersEl,
+    serveStatusEl,
+    serveBtn,
     nextVisitorEl,
     servedCountEl,
     lostCountEl,
@@ -254,32 +281,59 @@ async function bootstrap(): Promise<void> {
     ui.offlineEl.textContent = `Оффлайн-доход: +${formatMoney(offlineIncome)}`;
   }
 
-  const renderReadyOrders = (): void => {
+  let selectedOrderId: string | null = null;
+  let selectedCustomerId: string | null = null;
+  let isResetting = false;
+
+  const renderServeControls = (): void => {
     const currentState = app.getState();
 
-    if (currentState.cafe.readyOrders.length === 0) {
-      ui.readyOrdersEl.innerHTML = '<div class="hint">Пока ничего не готово.</div>';
-      return;
+    if (selectedOrderId && !currentState.cafe.readyOrders.some((order) => order.orderId === selectedOrderId)) {
+      selectedOrderId = null;
     }
 
-    ui.readyOrdersEl.innerHTML = currentState.cafe.readyOrders
-      .map(
-        (order) =>
-          `<button class="primary-btn ready-btn" data-order-id="${order.orderId}">Выдать ${order.recipeId} · ${formatMoney(order.price)}</button>`,
-      )
-      .join('');
+    if (selectedCustomerId && !currentState.cafe.pickupQueueCustomerIds.includes(selectedCustomerId)) {
+      selectedCustomerId = null;
+    }
 
-    ui.readyOrdersEl.querySelectorAll<HTMLButtonElement>('.ready-btn').forEach((button) => {
+    ui.pickupCustomersEl.innerHTML = currentState.cafe.pickupQueueCustomerIds.length
+      ? currentState.cafe.pickupQueueCustomerIds
+          .map((customerId, index) => {
+            const expectedOrder = currentState.cafe.readyOrders.find((order) => order.customerId === customerId);
+            const selectedClass = selectedCustomerId === customerId ? ' secondary-btn' : '';
+            const expectedRecipe = expectedOrder ? expectedOrder.recipeId : 'нет';
+            return `<button class="primary-btn pickup-customer-btn${selectedClass}" data-customer-id="${customerId}">#${index + 1} Клиент ${formatId(customerId)} · ждёт ${expectedRecipe}</button>`;
+          })
+          .join('')
+      : '<div class="hint">На выдаче пока никого нет.</div>';
+
+    ui.readyOrdersEl.innerHTML = currentState.cafe.readyOrders.length
+      ? currentState.cafe.readyOrders
+          .map((order) => {
+            const selectedClass = selectedOrderId === order.orderId ? ' secondary-btn' : '';
+            return `<button class="primary-btn ready-order-btn${selectedClass}" data-order-id="${order.orderId}">${order.recipeId} · ${formatMoney(order.price)} · для ${formatId(order.customerId)}</button>`;
+          })
+          .join('')
+      : '<div class="hint">Пока ничего не готово.</div>';
+
+    ui.pickupCustomersEl.querySelectorAll<HTMLButtonElement>('.pickup-customer-btn').forEach((button) => {
       button.addEventListener('click', () => {
-        const orderId = button.dataset.orderId;
-        if (!orderId) {
-          return;
-        }
-
-        app.serveReadyOrder(orderId);
+        selectedCustomerId = button.dataset.customerId ?? null;
         render();
       });
     });
+
+    ui.readyOrdersEl.querySelectorAll<HTMLButtonElement>('.ready-order-btn').forEach((button) => {
+      button.addEventListener('click', () => {
+        selectedOrderId = button.dataset.orderId ?? null;
+        render();
+      });
+    });
+
+    const customerText = selectedCustomerId ? formatId(selectedCustomerId) : '—';
+    const orderText = selectedOrderId ? formatId(selectedOrderId) : '—';
+    ui.serveStatusEl.textContent = `Клиент: ${customerText} · Заказ: ${orderText}`;
+    ui.serveBtn.disabled = !selectedOrderId || !selectedCustomerId;
   };
 
   function render(): void {
@@ -305,8 +359,19 @@ async function bootstrap(): Promise<void> {
     ui.upgradeCostEl.textContent = formatMoney(cost);
     ui.upgradeBtn.disabled = currentState.player.wallet.soft < cost;
 
-    renderReadyOrders();
+    renderServeControls();
   }
+
+  ui.serveBtn.addEventListener('click', () => {
+    if (!selectedOrderId || !selectedCustomerId) {
+      return;
+    }
+
+    app.serveReadyOrder(selectedOrderId, selectedCustomerId);
+    selectedOrderId = null;
+    selectedCustomerId = null;
+    render();
+  });
 
   ui.upgradeBtn.addEventListener('click', () => {
     app.tryBuyEquipmentUpgrade();
@@ -314,6 +379,12 @@ async function bootstrap(): Promise<void> {
   });
 
   ui.resetBtn.addEventListener('click', async () => {
+    isResetting = true;
+    clearInterval(tickHandle);
+    clearInterval(saveHandle);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    window.removeEventListener('pagehide', onPageHide);
+
     localStorage.removeItem(SAVE_KEY);
     await saveService.save({ schemaVersion: 1, savedAtUtcMs: Date.now(), gameState: createInitialState() });
     window.location.reload();
@@ -340,6 +411,10 @@ async function bootstrap(): Promise<void> {
   }, 250);
 
   const saveProgress = async (): Promise<void> => {
+    if (isResetting) {
+      return;
+    }
+
     await saveService.save(app.toSaveData(Date.now()));
   };
 
@@ -354,7 +429,9 @@ async function bootstrap(): Promise<void> {
   };
 
   const onPageHide = (): void => {
-    void saveProgress();
+    if (!isResetting) {
+      void saveProgress();
+    }
   };
 
   document.addEventListener('visibilitychange', onVisibilityChange);
