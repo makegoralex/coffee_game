@@ -123,7 +123,7 @@ export class GameApp {
     }
   }
 
-  public serveReadyOrder(orderId: string): boolean {
+  public serveReadyOrder(orderId: string, targetCustomerId?: string): boolean {
     if (this.state.cafe.readyOrders.length <= 0 || this.state.cafe.pickupQueueCustomerIds.length <= 0) {
       return false;
     }
@@ -133,13 +133,18 @@ export class GameApp {
       return false;
     }
 
+    const expectedCustomerId = targetCustomerId ?? this.state.cafe.pickupQueueCustomerIds[0];
+    const pickupIndex = this.state.cafe.pickupQueueCustomerIds.findIndex((id) => id === expectedCustomerId);
+    if (pickupIndex < 0) {
+      return false;
+    }
+
     const order = this.state.cafe.readyOrders[orderIndex];
-    const targetCustomerId = this.state.cafe.pickupQueueCustomerIds[0];
 
     this.state.cafe.readyOrders.splice(orderIndex, 1);
-    this.state.cafe.pickupQueueCustomerIds.shift();
+    this.state.cafe.pickupQueueCustomerIds.splice(pickupIndex, 1);
 
-    if (order.customerId === targetCustomerId) {
+    if (order.customerId === expectedCustomerId) {
       this.state.player.wallet.soft += order.price;
       this.state.cafe.serviceStats.servedCustomers += 1;
       this.state.cafe.rating = this.clampRating(this.state.cafe.rating + 0.7);
@@ -154,10 +159,10 @@ export class GameApp {
     this.eventBus.emit({
       type: 'order.misserved',
       orderId: order.orderId,
-      expectedCustomerId: targetCustomerId,
+      expectedCustomerId,
       actualCustomerId: order.customerId,
     });
-    this.eventBus.emit({ type: 'customer.lost', customerId: targetCustomerId, reason: 'left' });
+    this.eventBus.emit({ type: 'customer.lost', customerId: expectedCustomerId, reason: 'left' });
 
     return false;
   }
