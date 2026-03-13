@@ -1,7 +1,0 @@
-{
-  "archetypes": [
-    { "id": "student", "spawnWeight": 55, "patienceSec": 35, "valueMultiplier": 0.9 },
-    { "id": "office_worker", "spawnWeight": 35, "patienceSec": 28, "valueMultiplier": 1.1 },
-    { "id": "tourist", "spawnWeight": 10, "patienceSec": 45, "valueMultiplier": 1.4 }
-  ]
-}
