@@ -564,15 +564,15 @@ function updateFishing(dt: number): void {
 
   fishing.fightTimer += dt;
 
-  const fishBasePull = fishing.fishWeight + 0.8 + Math.abs(Math.sin(fishing.fightTimer * 3.1)) * 1.1;
-  const rodLoadNow = fishBasePull + (gPressed ? 1.5 : 0.35) + (hPressed ? 0.2 : 0);
-  const reelLoadNow = fishBasePull + (hPressed ? 1.45 : 0.3) + (gPressed ? 0.2 : 0);
+  const fishBasePull = 0.9 + fishing.fishWeight * 0.45 + Math.abs(Math.sin(fishing.fightTimer * 3.1)) * 0.7;
+  const rodLoadNow = fishBasePull + (gPressed ? 1.4 : 0.1) + (hPressed ? 0.15 : 0);
+  const reelLoadNow = fishBasePull + (hPressed ? 1.35 : 0.1) + (gPressed ? 0.15 : 0);
 
   fishing.currentLoad = (rodLoadNow + reelLoadNow) / 2;
 
   const isAlternatingBoost = (gPressed && fishing.lastPull === 'reel') || (hPressed && fishing.lastPull === 'rod');
-  const rodPower = gPressed ? (isAlternatingBoost ? 22 : 12) : -2;
-  const reelPower = hPressed ? (fishing.lastPull === 'rod' ? 20 : 7) : -2;
+  const rodPower = gPressed ? (isAlternatingBoost ? 22 : 12) : -2.2;
+  const reelPower = hPressed ? (fishing.lastPull === 'rod' ? 20 : 7) : -2.2;
   fishing.catchProgress += (rodPower + reelPower) * dt;
   fishing.catchProgress = Math.max(0, Math.min(100, fishing.catchProgress));
 
@@ -582,16 +582,16 @@ function updateFishing(dt: number): void {
     fishing.lastPull = 'reel';
   }
 
-  if (rodLoadNow > rigStats.rodLoad) {
+  if (gPressed && rodLoadNow > rigStats.rodLoad) {
     fishing.rodOverload += (rodLoadNow - rigStats.rodLoad) * dt;
   } else {
-    fishing.rodOverload = Math.max(0, fishing.rodOverload - dt * 0.9);
+    fishing.rodOverload = Math.max(0, fishing.rodOverload - dt * 1.1);
   }
 
-  if (reelLoadNow > rigStats.reelLoad) {
+  if (hPressed && reelLoadNow > rigStats.reelLoad) {
     fishing.reelOverload += (reelLoadNow - rigStats.reelLoad) * dt;
   } else {
-    fishing.reelOverload = Math.max(0, fishing.reelOverload - dt * 0.9);
+    fishing.reelOverload = Math.max(0, fishing.reelOverload - dt * 1.1);
   }
 
   updateFloatPosition();
