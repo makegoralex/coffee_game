@@ -6,6 +6,7 @@ type Screen = 'base' | 'map' | 'fishing';
 type ItemType = 'rod' | 'reel' | 'line' | 'hook' | 'bait';
 type FishingPhase = 'idle' | 'waiting' | 'bite' | 'hooked' | 'landed' | 'escaped' | 'broken';
 type PullAction = 'rod' | 'reel' | null;
+type UtilityPanel = 'shop' | 'keepnet';
 
 interface Rod {
   id: number;
@@ -74,6 +75,7 @@ let money = 1200;
 let totalFishCaught = 0;
 let currentLocationId = 'gold_lake';
 let keepnet: CaughtFish[] = [];
+let activeUtilityPanel: UtilityPanel = 'shop';
 
 let inventory: TackleItem[] = [
   { id: 'rod_basic', type: 'rod', name: 'Удилище Basic', loadKg: 6, price: 0, quantity: 1 },
@@ -300,12 +302,66 @@ function renderKeepnetList(): string {
   if (keepnet.length === 0) return '<div class="no-items">Садок пуст</div>';
 
   return keepnet
-    .slice(-4)
+    .slice()
     .reverse()
     .map(
-      (fish) => `<div class="keepnet-item ${fish.isTrophy ? 'trophy' : ''}">${fish.name} ${fish.weight.toFixed(2)} кг ${fish.isTrophy ? '(зачетная)' : ''} — ${formatMoney(fish.price)}</div>`
+      (fish) => `<div class="keepnet-item ${fish.isTrophy ? 'trophy' : ''}"><b>${fish.name}</b> • ${fish.weight.toFixed(2)} кг • ${fish.locationName}<br/>${fish.isTrophy ? 'Зачетная' : 'Обычная'} — ${formatMoney(fish.price)}</div>`
     )
     .join('');
+}
+
+function renderShopPanelCategorized(): string {
+  const categories: Array<{ type: ItemType; title: string }> = [
+    { type: 'rod', title: 'Удилища' },
+    { type: 'reel', title: 'Катушки' },
+    { type: 'line', title: 'Леска' },
+    { type: 'hook', title: 'Крючки' },
+    { type: 'bait', title: 'Наживка' },
+  ];
+
+  return `
+    <div class="shop-panel">
+      <div class="panel-title">Магазин снастей</div>
+      <div class="shop-list">
+        ${categories
+          .map((category) => {
+            const items = CATALOG.filter((item) => item.type === category.type && item.price > 0);
+
+            return `
+              <div class="shop-category">
+                <div class="shop-category-title">${category.title}</div>
+                ${
+                  items
+                    .map(
+                      (item) => `<button class="shop-btn" data-buy-id="${item.id}" ${money < item.price ? 'disabled' : ''}>${item.name} • ${item.loadKg}кг • ${formatMoney(item.price)}</button>`
+                    )
+                    .join('') || '<div class="no-items">нет товаров</div>'
+                }
+              </div>
+            `;
+          })
+          .join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderUtilityPanel(): string {
+  return `
+    <div class="utility-icons">
+      <button class="utility-btn ${activeUtilityPanel === 'shop' ? 'active' : ''}" id="open-shop-btn" title="Магазин">
+        <span class="utility-emoji">🛒</span>
+        <span>магазин</span>
+      </button>
+      <button class="utility-btn ${activeUtilityPanel === 'keepnet' ? 'active' : ''}" id="open-keepnet-btn" title="Садок">
+        <span class="utility-emoji">🧺</span>
+        <span>садок <small>${keepnet.length}</small></span>
+      </button>
+    </div>
+    <div class="utility-content">
+      ${activeUtilityPanel === 'shop' ? renderShopPanelCategorized() : `<div class="keepnet-panel"><div class="panel-title">Садок</div>${renderKeepnetList()}</div>`}
+    </div>
+  `;
 }
 
 function render(): void {
@@ -357,11 +413,7 @@ function render(): void {
 
           <div class="inventory">${renderAssemblyPanel(rigStats)}</div>
           <div class="chat-area">
-            ${renderShopPanel()}
-            <div class="keepnet-panel">
-              <div class="panel-title">Садок</div>
-              ${renderKeepnetList()}
-            </div>
+            ${renderUtilityPanel()}
           </div>
         </div>
       </div>
@@ -464,21 +516,6 @@ function renderAssemblyPanel(rigStats: { rodLoad: number; reelLoad: number; fina
   `;
 }
 
-function renderShopPanel(): string {
-  return `
-    <div class="shop-panel">
-      <div class="panel-title">Магазин снастей</div>
-      <div class="shop-list">
-        ${CATALOG.filter((item) => item.price > 0)
-          .map(
-            (item) => `<button class="shop-btn" data-buy-id="${item.id}" ${money < item.price ? 'disabled' : ''}>${item.name} • ${item.loadKg}кг • ${formatMoney(item.price)}</button>`
-          )
-          .join('')}
-      </div>
-    </div>
-  `;
-}
-
 function bindEvents(): void {
   document.querySelector<HTMLButtonElement>('#open-map-btn')?.addEventListener('click', () => {
     screen = 'map';
@@ -492,6 +529,16 @@ function bindEvents(): void {
 
   document.querySelector<HTMLButtonElement>('#sell-keepnet-btn')?.addEventListener('click', () => {
     sellKeepnet();
+  });
+
+  document.querySelector<HTMLButtonElement>('#open-shop-btn')?.addEventListener('click', () => {
+    activeUtilityPanel = 'shop';
+    render();
+  });
+
+  document.querySelector<HTMLButtonElement>('#open-keepnet-btn')?.addEventListener('click', () => {
+    activeUtilityPanel = 'keepnet';
+    render();
   });
 
   document.querySelector<HTMLButtonElement>('#close-map-btn')?.addEventListener('click', () => {

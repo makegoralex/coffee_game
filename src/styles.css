@@ -448,8 +448,9 @@ body {
   font-size: 14px;
   padding: 6px;
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: auto 1fr;
   gap: 6px;
+  overflow: hidden;
 }
 
 .panel-title {
@@ -457,8 +458,44 @@ body {
   margin-bottom: 4px;
 }
 
+.utility-icons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.utility-btn {
+  border: 1px solid #6f4f2f;
+  background: #ece6d6;
+  color: #2d1b0f;
+  font-size: 12px;
+  padding: 4px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.utility-btn.active {
+  background: #b8e6ae;
+}
+
+.utility-btn small {
+  font-size: 10px;
+}
+
+.utility-emoji {
+  font-size: 18px;
+}
+
+.utility-content {
+  min-height: 0;
+  overflow: hidden;
+}
+
 .assembly-panel,
-.shop-panel {
+.shop-panel,
+.keepnet-panel {
   height: 100%;
   overflow: hidden;
 }
@@ -514,6 +551,21 @@ body {
   font-weight: 700;
 }
 
+
+.shop-category {
+  margin-bottom: 6px;
+  border: 1px solid #9b8b74;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 4px;
+}
+
+.shop-category-title {
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: #4f2b13;
+}
+
 .shop-list {
   max-height: 150px;
   overflow: auto;
@@ -526,7 +578,7 @@ body {
   background: rgba(255, 255, 255, 0.55);
   padding: 4px;
   min-height: 58px;
-  max-height: 84px;
+  max-height: 150px;
   overflow: auto;
 }
 
