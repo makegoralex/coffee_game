@@ -10,12 +10,19 @@ import type { GameState, ReadyOrder, WaitingCustomer } from '@shared/types/state
 const SAVE_KEY = 'coffee-game-save-v1';
 const MAX_OFFLINE_SECONDS = 60 * 60 * 8;
 
+let runtimeIdCounter = 0;
+
 function createRuntimeId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
 
-  return `id_${Date.now()}_${Math.floor(Math.random() * 1_000_000_000)}`;
+  runtimeIdCounter += 1;
+  return `id_${Date.now()}_${runtimeIdCounter}`;
+}
+
+function formatId(id: string): string {
+  return id.length > 8 ? id.slice(-8) : id;
 }
 
 function toFiniteNumber(value: unknown, fallback: number): number {
@@ -276,6 +283,7 @@ async function bootstrap(): Promise<void> {
 
   let selectedOrderId: string | null = null;
   let selectedCustomerId: string | null = null;
+  let isResetting = false;
 
   const renderServeControls = (): void => {
     const currentState = app.getState();
@@ -291,9 +299,10 @@ async function bootstrap(): Promise<void> {
     ui.pickupCustomersEl.innerHTML = currentState.cafe.pickupQueueCustomerIds.length
       ? currentState.cafe.pickupQueueCustomerIds
           .map((customerId, index) => {
-            const shortId = customerId.slice(0, 8);
+            const expectedOrder = currentState.cafe.readyOrders.find((order) => order.customerId === customerId);
             const selectedClass = selectedCustomerId === customerId ? ' secondary-btn' : '';
-            return `<button class="primary-btn pickup-customer-btn${selectedClass}" data-customer-id="${customerId}">#${index + 1} Клиент ${shortId}</button>`;
+            const expectedRecipe = expectedOrder ? expectedOrder.recipeId : 'нет';
+            return `<button class="primary-btn pickup-customer-btn${selectedClass}" data-customer-id="${customerId}">#${index + 1} Клиент ${formatId(customerId)} · ждёт ${expectedRecipe}</button>`;
           })
           .join('')
       : '<div class="hint">На выдаче пока никого нет.</div>';
@@ -301,9 +310,8 @@ async function bootstrap(): Promise<void> {
     ui.readyOrdersEl.innerHTML = currentState.cafe.readyOrders.length
       ? currentState.cafe.readyOrders
           .map((order) => {
-            const shortCustomerId = order.customerId.slice(0, 8);
             const selectedClass = selectedOrderId === order.orderId ? ' secondary-btn' : '';
-            return `<button class="primary-btn ready-order-btn${selectedClass}" data-order-id="${order.orderId}">${order.recipeId} · ${formatMoney(order.price)} · для ${shortCustomerId}</button>`;
+            return `<button class="primary-btn ready-order-btn${selectedClass}" data-order-id="${order.orderId}">${order.recipeId} · ${formatMoney(order.price)} · для ${formatId(order.customerId)}</button>`;
           })
           .join('')
       : '<div class="hint">Пока ничего не готово.</div>';
@@ -322,8 +330,8 @@ async function bootstrap(): Promise<void> {
       });
     });
 
-    const customerText = selectedCustomerId ? selectedCustomerId.slice(0, 8) : '—';
-    const orderText = selectedOrderId ? selectedOrderId.slice(0, 8) : '—';
+    const customerText = selectedCustomerId ? formatId(selectedCustomerId) : '—';
+    const orderText = selectedOrderId ? formatId(selectedOrderId) : '—';
     ui.serveStatusEl.textContent = `Клиент: ${customerText} · Заказ: ${orderText}`;
     ui.serveBtn.disabled = !selectedOrderId || !selectedCustomerId;
   };
@@ -371,6 +379,12 @@ async function bootstrap(): Promise<void> {
   });
 
   ui.resetBtn.addEventListener('click', async () => {
+    isResetting = true;
+    clearInterval(tickHandle);
+    clearInterval(saveHandle);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    window.removeEventListener('pagehide', onPageHide);
+
     localStorage.removeItem(SAVE_KEY);
     await saveService.save({ schemaVersion: 1, savedAtUtcMs: Date.now(), gameState: createInitialState() });
     window.location.reload();
@@ -397,6 +411,10 @@ async function bootstrap(): Promise<void> {
   }, 250);
 
   const saveProgress = async (): Promise<void> => {
+    if (isResetting) {
+      return;
+    }
+
     await saveService.save(app.toSaveData(Date.now()));
   };
 
@@ -411,7 +429,9 @@ async function bootstrap(): Promise<void> {
   };
 
   const onPageHide = (): void => {
-    void saveProgress();
+    if (!isResetting) {
+      void saveProgress();
+    }
   };
 
   document.addEventListener('visibilitychange', onVisibilityChange);

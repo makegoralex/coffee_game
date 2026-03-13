@@ -13,12 +13,15 @@ const RECIPES: Record<RecipeId, { brewSec: number; priceMultiplier: number }> = 
 
 const RECIPE_IDS: RecipeId[] = ['espresso', 'americano', 'latte'];
 
+let runtimeIdCounter = 0;
+
 function createRuntimeId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
 
-  return `id_${Date.now()}_${Math.floor(Math.random() * 1_000_000_000)}`;
+  runtimeIdCounter += 1;
+  return `id_${Date.now()}_${runtimeIdCounter}`;
 }
 
 export class GameApp {
