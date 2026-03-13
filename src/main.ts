@@ -179,6 +179,18 @@ async function bootstrap(): Promise<void> {
         <p class="subtitle">MVP для Яндекс Игр — очередь, ошибки выдачи, рейтинг</p>
       </header>
 
+      <section class="card cafe-scene-card">
+        <h2>Зал кофейни</h2>
+        <div class="cafe-scene" id="cafe-scene">
+          <div class="scene-zone machine-zone">☕ Кухня</div>
+          <div class="scene-zone counter-zone">🧾 Выдача</div>
+          <div class="scene-zone hall-zone">🪑 Зал</div>
+          <div class="visitors-layer" id="visitors-layer"></div>
+          <div class="barista" id="barista">🧑‍🍳</div>
+        </div>
+        <div class="hint" id="machine-state">Сцена загружается…</div>
+      </section>
+
       <section class="card">
         <div class="label">Баланс кофейни</div>
         <div class="money" id="money">0 ₽</div>
@@ -262,6 +274,10 @@ async function bootstrap(): Promise<void> {
     </main>
   `;
 
+  const cafeSceneEl = root.querySelector<HTMLElement>('#cafe-scene');
+  const visitorsLayerEl = root.querySelector<HTMLElement>('#visitors-layer');
+  const baristaEl = root.querySelector<HTMLElement>('#barista');
+  const machineStateEl = root.querySelector<HTMLElement>('#machine-state');
   const moneyEl = root.querySelector<HTMLElement>('#money');
   const incomeEl = root.querySelector<HTMLElement>('#income-breakdown');
   const ratingEl = root.querySelector<HTMLElement>('#rating');
@@ -291,11 +307,15 @@ async function bootstrap(): Promise<void> {
   const lostCountEl = root.querySelector<HTMLElement>('#lost-count');
   const wrongCountEl = root.querySelector<HTMLElement>('#wrong-count');
 
-  if (!moneyEl || !incomeEl || !ratingEl || !offlineEl || !upgradeBtn || !upgradeCostEl || !equipLevelEl || !resetBtn || !marketingBtn || !assistantBtn || !marketingCostEl || !flowLevelEl || !assistantLevelEl || !assistantCostEl || !assistantEffectEl || !assistantProgressFillEl || !queueSizeEl || !brewingStatusEl || !brewProgressFillEl || !pickupSizeEl || !readyOrdersEl || !pickupCustomersEl || !serveStatusEl || !serveBtn || !nextVisitorEl || !servedCountEl || !lostCountEl || !wrongCountEl) {
+  if (!cafeSceneEl || !visitorsLayerEl || !baristaEl || !machineStateEl || !moneyEl || !incomeEl || !ratingEl || !offlineEl || !upgradeBtn || !upgradeCostEl || !equipLevelEl || !resetBtn || !marketingBtn || !assistantBtn || !marketingCostEl || !flowLevelEl || !assistantLevelEl || !assistantCostEl || !assistantEffectEl || !assistantProgressFillEl || !queueSizeEl || !brewingStatusEl || !brewProgressFillEl || !pickupSizeEl || !readyOrdersEl || !pickupCustomersEl || !serveStatusEl || !serveBtn || !nextVisitorEl || !servedCountEl || !lostCountEl || !wrongCountEl) {
     throw new Error('Missing UI elements');
   }
 
   const ui = {
+    cafeSceneEl,
+    visitorsLayerEl,
+    baristaEl,
+    machineStateEl,
     moneyEl,
     incomeEl,
     ratingEl,
@@ -333,6 +353,41 @@ async function bootstrap(): Promise<void> {
   let selectedOrderId: string | null = null;
   let selectedCustomerId: string | null = null;
   let isResetting = false;
+
+
+  const renderCafeScene = (): void => {
+    const currentState = app.getState();
+
+    const hallVisitors = currentState.cafe.queueCustomers.slice(0, 6);
+    const pickupVisitors = currentState.cafe.pickupQueueCustomerIds.slice(0, 6);
+
+    const hallMarkup = hallVisitors
+      .map((customer, index) => `<div class="scene-visitor hall" style="left: ${10 + index * 11}%" title="Ожидает: ${customer.recipeId ?? 'americano'}">🧍</div>`)
+      .join('');
+    const pickupMarkup = pickupVisitors
+      .map((customerId, index) => {
+        const selectedClass = selectedCustomerId === customerId ? ' selected' : '';
+        return `<div class="scene-visitor pickup${selectedClass}" style="left: ${62 + index * 6}%">🧍</div>`;
+      })
+      .join('');
+
+    ui.visitorsLayerEl.innerHTML = hallMarkup + pickupMarkup;
+
+    let baristaX = 30;
+    let machineState = 'Бариста готовит рабочее место';
+
+    if (currentState.cafe.activeOrder) {
+      const progress = Math.min(1, currentState.cafe.activeOrder.progressSec / currentState.cafe.activeOrder.requiredSec);
+      baristaX = 34 + progress * 38;
+      machineState = `Готовим ${currentState.cafe.activeOrder.recipeId}`;
+    } else if (currentState.cafe.pickupQueueCustomerIds.length > 0) {
+      baristaX = 78;
+      machineState = 'Выдача заказов у стойки';
+    }
+
+    ui.baristaEl.style.left = `${baristaX}%`;
+    ui.machineStateEl.textContent = machineState;
+  };
 
   const renderServeControls = (): void => {
     const currentState = app.getState();
@@ -430,6 +485,7 @@ async function bootstrap(): Promise<void> {
       : 0;
     ui.assistantProgressFillEl.style.width = `${assistantProgress}%`;
 
+    renderCafeScene();
     renderServeControls();
   }
 
