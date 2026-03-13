@@ -115,6 +115,23 @@ button:disabled {
   margin-bottom: 10px;
 }
 
+.progress-track {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #f1e3cf;
+  border: 1px solid #ead7bc;
+  overflow: hidden;
+  margin: 4px 0 10px;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #a86833 0%, #6b3e1f 100%);
+  transition: width 0.18s ease;
+}
+
 @media (max-width: 640px) {
   #app {
     padding: 10px;
