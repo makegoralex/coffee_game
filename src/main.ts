@@ -513,13 +513,13 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
       </div>
 
       <div class="tension-widget">
-        <div class="tension-column">
-          <div class="bar-title">Удилище</div>
-          <div class="bar-track rod"><i id="rod-load-bar" style="width:${Math.max(0, Math.min(100, fishing.rodTension * 100)).toFixed(0)}%"></i></div>
+        <div class="tension-meter">
+          <div class="tension-title">Удилище</div>
+          <div class="tension-track tension-track--rod"><i id="rod-load-bar" style="width:${Math.max(0, Math.min(100, fishing.rodTension * 100)).toFixed(0)}%"></i></div>
         </div>
-        <div class="tension-column">
-          <div class="bar-title">Катушка</div>
-          <div class="bar-track reel"><i id="reel-load-bar" style="width:${Math.max(0, Math.min(100, fishing.reelTension * 100)).toFixed(0)}%"></i></div>
+        <div class="tension-meter">
+          <div class="tension-title">Катушка</div>
+          <div class="tension-track tension-track--reel"><i id="reel-load-bar" style="width:${Math.max(0, Math.min(100, fishing.reelTension * 100)).toFixed(0)}%"></i></div>
         </div>
       </div>
 
