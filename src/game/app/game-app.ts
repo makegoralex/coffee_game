@@ -10,7 +10,16 @@ const RECIPES: Record<RecipeId, { brewSec: number; priceMultiplier: number }> = 
   latte: { brewSec: 6.2, priceMultiplier: 1.25 },
 };
 
+
 const RECIPE_IDS: RecipeId[] = ['espresso', 'americano', 'latte'];
+
+function createRuntimeId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `id_${Date.now()}_${Math.floor(Math.random() * 1_000_000_000)}`;
+}
 
 export class GameApp {
   private readonly economy = new EconomySystem();
@@ -38,7 +47,7 @@ export class GameApp {
 
   private createCustomer(): WaitingCustomer {
     return {
-      id: crypto.randomUUID(),
+      id: createRuntimeId(),
       recipeId: this.pickRecipeId(),
       patienceSec: 10 + Math.random() * 8,
       waitedSec: 0,
@@ -78,7 +87,7 @@ export class GameApp {
     if (!this.state.cafe.activeOrder && this.state.cafe.queueCustomers.length > 0) {
       const customer = this.state.cafe.queueCustomers.shift();
       if (customer) {
-        const orderId = crypto.randomUUID();
+        const orderId = createRuntimeId();
         const recipeId = customer.recipeId ?? 'americano';
         this.state.cafe.activeOrder = {
           orderId,
@@ -184,7 +193,12 @@ export class GameApp {
     return estimatedOrders * this.state.cafe.manualSaleIncome * 0.35;
   }
 
-  public applyOfflineIncome(_amount: number, nowUtcMs: number): void {
+  public applyOfflineIncome(amount: number, nowUtcMs: number): void {
+    if (amount > 0) {
+      this.state.player.wallet.soft += amount;
+      this.eventBus.emit({ type: 'economy.moneyEarned', amount });
+    }
+
     this.state.timing.lastActiveTimestampUtcMs = nowUtcMs;
   }
 

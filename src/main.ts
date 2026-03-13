@@ -10,13 +10,21 @@ import type { GameState, ReadyOrder, WaitingCustomer } from '@shared/types/state
 const SAVE_KEY = 'coffee-game-save-v1';
 const MAX_OFFLINE_SECONDS = 60 * 60 * 8;
 
+function createRuntimeId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `id_${Date.now()}_${Math.floor(Math.random() * 1_000_000_000)}`;
+}
+
 function toFiniteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
 function sanitizeCustomer(raw: Partial<WaitingCustomer>): WaitingCustomer {
   return {
-    id: typeof raw.id === 'string' ? raw.id : crypto.randomUUID(),
+    id: typeof raw.id === 'string' ? raw.id : createRuntimeId(),
     recipeId: raw.recipeId === 'espresso' || raw.recipeId === 'americano' || raw.recipeId === 'latte' ? raw.recipeId : 'americano',
     patienceSec: Math.max(3, toFiniteNumber(raw.patienceSec, 12)),
     waitedSec: Math.max(0, toFiniteNumber(raw.waitedSec, 0)),
@@ -29,8 +37,8 @@ function sanitizeCustomer(raw: Partial<WaitingCustomer>): WaitingCustomer {
 
 function sanitizeReadyOrder(raw: Partial<ReadyOrder>): ReadyOrder {
   return {
-    orderId: typeof raw.orderId === 'string' ? raw.orderId : crypto.randomUUID(),
-    customerId: typeof raw.customerId === 'string' ? raw.customerId : crypto.randomUUID(),
+    orderId: typeof raw.orderId === 'string' ? raw.orderId : createRuntimeId(),
+    customerId: typeof raw.customerId === 'string' ? raw.customerId : createRuntimeId(),
     recipeId: raw.recipeId === 'espresso' || raw.recipeId === 'americano' || raw.recipeId === 'latte' ? raw.recipeId : 'americano',
     price: Math.max(1, toFiniteNumber(raw.price, 5)),
   };
@@ -65,8 +73,8 @@ function sanitizeState(raw: GameState): GameState {
       queueCustomers: Array.isArray(raw.cafe?.queueCustomers) ? raw.cafe.queueCustomers.map((customer) => sanitizeCustomer(customer)) : [],
       activeOrder: raw.cafe?.activeOrder
         ? {
-            orderId: typeof raw.cafe.activeOrder.orderId === 'string' ? raw.cafe.activeOrder.orderId : crypto.randomUUID(),
-            customerId: typeof raw.cafe.activeOrder.customerId === 'string' ? raw.cafe.activeOrder.customerId : crypto.randomUUID(),
+            orderId: typeof raw.cafe.activeOrder.orderId === 'string' ? raw.cafe.activeOrder.orderId : createRuntimeId(),
+            customerId: typeof raw.cafe.activeOrder.customerId === 'string' ? raw.cafe.activeOrder.customerId : createRuntimeId(),
             recipeId:
               raw.cafe.activeOrder.recipeId === 'espresso' || raw.cafe.activeOrder.recipeId === 'americano' || raw.cafe.activeOrder.recipeId === 'latte'
                 ? raw.cafe.activeOrder.recipeId
@@ -99,8 +107,8 @@ function sanitizeState(raw: GameState): GameState {
           : { customerIds: [], maxSize: 8 },
       activeOrders: Array.isArray(raw.cafe?.activeOrders)
         ? raw.cafe.activeOrders.map((order) => ({
-            id: typeof order.id === 'string' ? order.id : crypto.randomUUID(),
-            customerId: typeof order.customerId === 'string' ? order.customerId : crypto.randomUUID(),
+            id: typeof order.id === 'string' ? order.id : createRuntimeId(),
+            customerId: typeof order.customerId === 'string' ? order.customerId : createRuntimeId(),
             recipeId: typeof order.recipeId === 'string' ? order.recipeId : 'americano',
             progressSec: Math.max(0, toFiniteNumber(order.progressSec, 0)),
             remainingBrewSec: Math.max(0, toFiniteNumber(order.remainingBrewSec, 0)),
