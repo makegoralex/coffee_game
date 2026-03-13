@@ -21,46 +21,65 @@ let rods: Rod[] = [];
 let rodId = 0;
 
 const MAX_RODS = 3;
+const BASE_UI_WIDTH = 1280;
+const BASE_UI_HEIGHT = 960;
+
+function applyViewportScale(): void {
+  const viewportFit = document.querySelector<HTMLDivElement>('.viewport-fit');
+
+  if (!viewportFit) {
+    return;
+  }
+
+  const horizontalScale = (window.innerWidth - 24) / BASE_UI_WIDTH;
+  const verticalScale = (window.innerHeight - 24) / BASE_UI_HEIGHT;
+  const scale = Math.min(horizontalScale, verticalScale, 1);
+
+  viewportFit.style.setProperty('--ui-scale', `${Math.max(scale, 0.5)}`);
+}
 
 function render(): void {
   app.innerHTML = `
-    <div class="game-root wood-bg">
-      ${renderTopBar()}
-      <div class="main-layout">
-        <div class="left-stage">
-          ${screen === 'base' ? renderBaseScreen() : ''}
-          ${screen === 'map' ? renderMapScreen() : ''}
-          ${screen === 'fishing' ? renderFishingScreen() : ''}
-        </div>
-        <aside class="right-sidebar">
-          <div class="depth-widget">
-            <div class="depth-line"></div>
-            <div class="depth-value">6,24 m</div>
+    <div class="viewport-fit">
+      <div class="game-root wood-bg">
+        ${renderTopBar()}
+        <div class="main-layout">
+          <div class="left-stage">
+            ${screen === 'base' ? renderBaseScreen() : ''}
+            ${screen === 'map' ? renderMapScreen() : ''}
+            ${screen === 'fishing' ? renderFishingScreen() : ''}
           </div>
-          <button class="mini-map ${screen !== 'map' ? 'clickable' : ''}" id="open-map-btn" ${screen === 'map' ? 'disabled' : ''}>
-            <span>Карта</span>
-          </button>
-          <button class="base-btn" id="go-base-btn">На базу</button>
-          <div class="info-card">
-            <h3>Золотая рыбка</h3>
-            <p>${screen === 'base' ? 'Рыболовная база' : 'Золотой берег'}</p>
-            <a href="#" onclick="return false">Продлить путевку</a>
-            <small>Стоимость дня: 135 000 руб.</small>
-          </div>
-        </aside>
-      </div>
-      <div class="bottom-panel">
-        <div class="status-bars">
-          <div class="status-item"><span>еда</span><div class="bar"><i style="height: 28%"></i></div></div>
-          <div class="status-item"><span>алк</span><div class="bar"><i style="height: 18%"></i></div></div>
+          <aside class="right-sidebar">
+            <div class="depth-widget">
+              <div class="depth-line"></div>
+              <div class="depth-value">6,24 m</div>
+            </div>
+            <button class="mini-map ${screen !== 'map' ? 'clickable' : ''}" id="open-map-btn" ${screen === 'map' ? 'disabled' : ''}>
+              <span>Карта</span>
+            </button>
+            <button class="base-btn" id="go-base-btn">На базу</button>
+            <div class="info-card">
+              <h3>Золотая рыбка</h3>
+              <p>${screen === 'base' ? 'Рыболовная база' : 'Золотой берег'}</p>
+              <a href="#" onclick="return false">Продлить путевку</a>
+              <small>Стоимость дня: 135 000 руб.</small>
+            </div>
+          </aside>
         </div>
-        <div class="inventory"></div>
-        <div class="chat-area">чат</div>
+        <div class="bottom-panel">
+          <div class="status-bars">
+            <div class="status-item"><span>еда</span><div class="bar"><i style="height: 28%"></i></div></div>
+            <div class="status-item"><span>алк</span><div class="bar"><i style="height: 18%"></i></div></div>
+          </div>
+          <div class="inventory"></div>
+          <div class="chat-area">чат</div>
+        </div>
       </div>
     </div>
   `;
 
   bindEvents();
+  applyViewportScale();
 }
 
 function renderTopBar(): string {
@@ -168,5 +187,7 @@ function bindEvents(): void {
     render();
   });
 }
+
+window.addEventListener('resize', applyViewportScale);
 
 render();
