@@ -225,6 +225,19 @@ async function bootstrap(): Promise<void> {
         <button class="secondary-btn" id="upgrade-btn">Улучшить оборудование</button>
       </section>
 
+      <section class="card upgrade">
+        <h2>Маркетинг</h2>
+        <div class="row">
+          <span class="label">Поток клиентов</span>
+          <span class="label" id="flow-level">0/мин</span>
+        </div>
+        <div class="row">
+          <span class="label">Стоимость</span>
+          <span class="label" id="marketing-cost">0 ₽</span>
+        </div>
+        <button class="secondary-btn" id="marketing-btn">Запустить рекламу</button>
+      </section>
+
       <section class="card">
         <button class="secondary-btn" id="reset-btn">Сбросить прогресс</button>
       </section>
@@ -237,8 +250,11 @@ async function bootstrap(): Promise<void> {
   const offlineEl = root.querySelector<HTMLElement>('#offline-info');
   const upgradeBtn = root.querySelector<HTMLButtonElement>('#upgrade-btn');
   const resetBtn = root.querySelector<HTMLButtonElement>('#reset-btn');
+  const marketingBtn = root.querySelector<HTMLButtonElement>('#marketing-btn');
   const upgradeCostEl = root.querySelector<HTMLElement>('#upgrade-cost');
   const equipLevelEl = root.querySelector<HTMLElement>('#equip-level');
+  const marketingCostEl = root.querySelector<HTMLElement>('#marketing-cost');
+  const flowLevelEl = root.querySelector<HTMLElement>('#flow-level');
   const queueSizeEl = root.querySelector<HTMLElement>('#queue-size');
   const brewingStatusEl = root.querySelector<HTMLElement>('#brewing-status');
   const pickupSizeEl = root.querySelector<HTMLElement>('#pickup-size');
@@ -251,7 +267,7 @@ async function bootstrap(): Promise<void> {
   const lostCountEl = root.querySelector<HTMLElement>('#lost-count');
   const wrongCountEl = root.querySelector<HTMLElement>('#wrong-count');
 
-  if (!moneyEl || !incomeEl || !ratingEl || !offlineEl || !upgradeBtn || !upgradeCostEl || !equipLevelEl || !resetBtn || !queueSizeEl || !brewingStatusEl || !pickupSizeEl || !readyOrdersEl || !pickupCustomersEl || !serveStatusEl || !serveBtn || !nextVisitorEl || !servedCountEl || !lostCountEl || !wrongCountEl) {
+  if (!moneyEl || !incomeEl || !ratingEl || !offlineEl || !upgradeBtn || !upgradeCostEl || !equipLevelEl || !resetBtn || !marketingBtn || !marketingCostEl || !flowLevelEl || !queueSizeEl || !brewingStatusEl || !pickupSizeEl || !readyOrdersEl || !pickupCustomersEl || !serveStatusEl || !serveBtn || !nextVisitorEl || !servedCountEl || !lostCountEl || !wrongCountEl) {
     throw new Error('Missing UI elements');
   }
 
@@ -262,8 +278,11 @@ async function bootstrap(): Promise<void> {
     offlineEl,
     upgradeBtn,
     resetBtn,
+    marketingBtn,
     upgradeCostEl,
     equipLevelEl,
+    marketingCostEl,
+    flowLevelEl,
     queueSizeEl,
     brewingStatusEl,
     pickupSizeEl,
@@ -339,6 +358,7 @@ async function bootstrap(): Promise<void> {
   function render(): void {
     const currentState = app.getState();
     const cost = app.getEquipmentUpgradeCost();
+    const marketingCost = app.getMarketingUpgradeCost();
 
     ui.moneyEl.textContent = formatMoney(currentState.player.wallet.soft);
     ui.incomeEl.textContent = `Базовый чек: ${formatMoney(currentState.cafe.manualSaleIncome)}`;
@@ -359,6 +379,10 @@ async function bootstrap(): Promise<void> {
     ui.upgradeCostEl.textContent = formatMoney(cost);
     ui.upgradeBtn.disabled = currentState.player.wallet.soft < cost;
 
+    ui.flowLevelEl.textContent = `${currentState.cafe.customerFlowPerMinute.toFixed(0)}/мин`;
+    ui.marketingCostEl.textContent = formatMoney(marketingCost);
+    ui.marketingBtn.disabled = currentState.player.wallet.soft < marketingCost;
+
     renderServeControls();
   }
 
@@ -375,6 +399,11 @@ async function bootstrap(): Promise<void> {
 
   ui.upgradeBtn.addEventListener('click', () => {
     app.tryBuyEquipmentUpgrade();
+    render();
+  });
+
+  ui.marketingBtn.addEventListener('click', () => {
+    app.tryBuyMarketingUpgrade();
     render();
   });
 

@@ -194,6 +194,39 @@ export class GameApp {
     return this.economy.computeEquipmentUpgradeCost(this.state);
   }
 
+  private getMarketingUpgradeLevel(): number {
+    const baseFlow = 18;
+    const step = 2;
+    const normalized = Math.max(0, this.state.cafe.customerFlowPerMinute - baseFlow);
+    return Math.floor(normalized / step) + 1;
+  }
+
+  public getMarketingUpgradeCost(): number {
+    const exponent = 1.32;
+    const baseCost = Math.max(20, Math.floor(this.state.cafe.equipmentUpgradeBaseCost * 0.8));
+    return Math.floor(baseCost * Math.pow(exponent, this.getMarketingUpgradeLevel() - 1));
+  }
+
+  public tryBuyMarketingUpgrade(): boolean {
+    const cost = this.getMarketingUpgradeCost();
+    if (this.state.player.wallet.soft < cost) {
+      return false;
+    }
+
+    this.state.player.wallet.soft -= cost;
+    this.state.cafe.customerFlowPerMinute = Math.min(120, this.state.cafe.customerFlowPerMinute + 2);
+    this.state.cafe.rating = this.clampRating(this.state.cafe.rating + 0.5);
+
+    this.eventBus.emit({ type: 'economy.moneySpent', amount: cost });
+    this.eventBus.emit({
+      type: 'upgrade.bought',
+      upgradeId: 'marketing_campaign_level',
+      newLevel: this.getMarketingUpgradeLevel(),
+    });
+
+    return true;
+  }
+
   public computeOfflineIncome(nowUtcMs: number, maxOfflineSeconds: number): number {
     const elapsedSeconds = Math.max(0, Math.floor((nowUtcMs - this.state.timing.lastActiveTimestampUtcMs) / 1000));
     const clamped = Math.min(elapsedSeconds, maxOfflineSeconds);
