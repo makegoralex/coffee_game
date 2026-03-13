@@ -62,6 +62,37 @@ export class GameApp {
     return Math.min(100, Math.max(0, value));
   }
 
+  private findMatchingReadyOrderForCustomer(customerId: string): string | null {
+    const order = this.state.cafe.readyOrders.find((entry) => entry.customerId === customerId);
+    return order?.orderId ?? null;
+  }
+
+  private processAssistantAutoServe(deltaSeconds: number): void {
+    if (this.state.cafe.assistantLevel <= 0) {
+      this.state.cafe.assistantProgressSec = 0;
+      return;
+    }
+
+    const intervalSec = Math.max(1, 7 - this.state.cafe.assistantLevel);
+    this.state.cafe.assistantProgressSec += deltaSeconds;
+
+    while (this.state.cafe.assistantProgressSec >= intervalSec) {
+      this.state.cafe.assistantProgressSec -= intervalSec;
+
+      const targetCustomerId = this.state.cafe.pickupQueueCustomerIds[0];
+      if (!targetCustomerId) {
+        return;
+      }
+
+      const matchingOrderId = this.findMatchingReadyOrderForCustomer(targetCustomerId);
+      if (!matchingOrderId) {
+        return;
+      }
+
+      this.serveReadyOrder(matchingOrderId, targetCustomerId);
+    }
+  }
+
   public tick(deltaSeconds: number): void {
     this.state.timing.totalSessionSeconds += deltaSeconds;
     this.state.timing.lastActiveTimestampUtcMs = Date.now();
@@ -124,6 +155,8 @@ export class GameApp {
         this.eventBus.emit({ type: 'order.completed', orderId: completedOrder.orderId, amount });
       }
     }
+
+    this.processAssistantAutoServe(deltaSeconds);
   }
 
   public serveReadyOrder(orderId: string, targetCustomerId?: string): boolean {
@@ -205,6 +238,31 @@ export class GameApp {
     const exponent = 1.32;
     const baseCost = Math.max(20, Math.floor(this.state.cafe.equipmentUpgradeBaseCost * 0.8));
     return Math.floor(baseCost * Math.pow(exponent, this.getMarketingUpgradeLevel() - 1));
+  }
+
+  public getAssistantUpgradeCost(): number {
+    const baseCost = Math.max(30, this.state.cafe.equipmentUpgradeBaseCost);
+    const exponent = 1.45;
+    return Math.floor(baseCost * Math.pow(exponent, this.state.cafe.assistantLevel));
+  }
+
+  public tryBuyAssistantUpgrade(): boolean {
+    const cost = this.getAssistantUpgradeCost();
+    if (this.state.player.wallet.soft < cost) {
+      return false;
+    }
+
+    this.state.player.wallet.soft -= cost;
+    this.state.cafe.assistantLevel += 1;
+
+    this.eventBus.emit({ type: 'economy.moneySpent', amount: cost });
+    this.eventBus.emit({
+      type: 'upgrade.bought',
+      upgradeId: 'assistant_barista_level',
+      newLevel: this.state.cafe.assistantLevel,
+    });
+
+    return true;
   }
 
   public tryBuyMarketingUpgrade(): boolean {

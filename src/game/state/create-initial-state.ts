@@ -49,6 +49,8 @@ export function createInitialState(): GameState {
       activeOrder: null,
       pickupQueueCustomerIds: [],
       readyOrders: [],
+      assistantLevel: 0,
+      assistantProgressSec: 0,
 
       rating: 80,
       serviceStats: {

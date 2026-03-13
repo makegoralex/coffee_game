@@ -94,6 +94,8 @@ function sanitizeState(raw: GameState): GameState {
         ? raw.cafe.pickupQueueCustomerIds.filter((id): id is string => typeof id === 'string')
         : [],
       readyOrders: Array.isArray(raw.cafe?.readyOrders) ? raw.cafe.readyOrders.map((order) => sanitizeReadyOrder(order)) : [],
+      assistantLevel: Math.max(0, Math.floor(toFiniteNumber(raw.cafe?.assistantLevel, initial.cafe.assistantLevel))),
+      assistantProgressSec: Math.max(0, toFiniteNumber(raw.cafe?.assistantProgressSec, initial.cafe.assistantProgressSec)),
       rating: Math.min(100, Math.max(0, toFiniteNumber(raw.cafe?.rating, initial.cafe.rating))),
       serviceStats: {
         servedCustomers: Math.max(0, Math.floor(toFiniteNumber(raw.cafe?.serviceStats?.servedCustomers, 0))),
@@ -238,6 +240,20 @@ async function bootstrap(): Promise<void> {
         <button class="secondary-btn" id="marketing-btn">Запустить рекламу</button>
       </section>
 
+      <section class="card upgrade">
+        <h2>Помощник-бариста</h2>
+        <div class="row">
+          <span class="label">Уровень</span>
+          <span class="label" id="assistant-level">0</span>
+        </div>
+        <div class="row">
+          <span class="label">Стоимость</span>
+          <span class="label" id="assistant-cost">0 ₽</span>
+        </div>
+        <div class="hint" id="assistant-effect">Автовыдача: выключена</div>
+        <button class="secondary-btn" id="assistant-btn">Нанять/улучшить помощника</button>
+      </section>
+
       <section class="card">
         <button class="secondary-btn" id="reset-btn">Сбросить прогресс</button>
       </section>
@@ -251,10 +267,14 @@ async function bootstrap(): Promise<void> {
   const upgradeBtn = root.querySelector<HTMLButtonElement>('#upgrade-btn');
   const resetBtn = root.querySelector<HTMLButtonElement>('#reset-btn');
   const marketingBtn = root.querySelector<HTMLButtonElement>('#marketing-btn');
+  const assistantBtn = root.querySelector<HTMLButtonElement>('#assistant-btn');
   const upgradeCostEl = root.querySelector<HTMLElement>('#upgrade-cost');
   const equipLevelEl = root.querySelector<HTMLElement>('#equip-level');
   const marketingCostEl = root.querySelector<HTMLElement>('#marketing-cost');
   const flowLevelEl = root.querySelector<HTMLElement>('#flow-level');
+  const assistantLevelEl = root.querySelector<HTMLElement>('#assistant-level');
+  const assistantCostEl = root.querySelector<HTMLElement>('#assistant-cost');
+  const assistantEffectEl = root.querySelector<HTMLElement>('#assistant-effect');
   const queueSizeEl = root.querySelector<HTMLElement>('#queue-size');
   const brewingStatusEl = root.querySelector<HTMLElement>('#brewing-status');
   const pickupSizeEl = root.querySelector<HTMLElement>('#pickup-size');
@@ -267,7 +287,7 @@ async function bootstrap(): Promise<void> {
   const lostCountEl = root.querySelector<HTMLElement>('#lost-count');
   const wrongCountEl = root.querySelector<HTMLElement>('#wrong-count');
 
-  if (!moneyEl || !incomeEl || !ratingEl || !offlineEl || !upgradeBtn || !upgradeCostEl || !equipLevelEl || !resetBtn || !marketingBtn || !marketingCostEl || !flowLevelEl || !queueSizeEl || !brewingStatusEl || !pickupSizeEl || !readyOrdersEl || !pickupCustomersEl || !serveStatusEl || !serveBtn || !nextVisitorEl || !servedCountEl || !lostCountEl || !wrongCountEl) {
+  if (!moneyEl || !incomeEl || !ratingEl || !offlineEl || !upgradeBtn || !upgradeCostEl || !equipLevelEl || !resetBtn || !marketingBtn || !assistantBtn || !marketingCostEl || !flowLevelEl || !assistantLevelEl || !assistantCostEl || !assistantEffectEl || !queueSizeEl || !brewingStatusEl || !pickupSizeEl || !readyOrdersEl || !pickupCustomersEl || !serveStatusEl || !serveBtn || !nextVisitorEl || !servedCountEl || !lostCountEl || !wrongCountEl) {
     throw new Error('Missing UI elements');
   }
 
@@ -279,10 +299,14 @@ async function bootstrap(): Promise<void> {
     upgradeBtn,
     resetBtn,
     marketingBtn,
+    assistantBtn,
     upgradeCostEl,
     equipLevelEl,
     marketingCostEl,
     flowLevelEl,
+    assistantLevelEl,
+    assistantCostEl,
+    assistantEffectEl,
     queueSizeEl,
     brewingStatusEl,
     pickupSizeEl,
@@ -359,6 +383,7 @@ async function bootstrap(): Promise<void> {
     const currentState = app.getState();
     const cost = app.getEquipmentUpgradeCost();
     const marketingCost = app.getMarketingUpgradeCost();
+    const assistantCost = app.getAssistantUpgradeCost();
 
     ui.moneyEl.textContent = formatMoney(currentState.player.wallet.soft);
     ui.incomeEl.textContent = `Базовый чек: ${formatMoney(currentState.cafe.manualSaleIncome)}`;
@@ -383,6 +408,13 @@ async function bootstrap(): Promise<void> {
     ui.marketingCostEl.textContent = formatMoney(marketingCost);
     ui.marketingBtn.disabled = currentState.player.wallet.soft < marketingCost;
 
+    ui.assistantLevelEl.textContent = String(currentState.cafe.assistantLevel);
+    ui.assistantCostEl.textContent = formatMoney(assistantCost);
+    ui.assistantBtn.disabled = currentState.player.wallet.soft < assistantCost;
+    ui.assistantEffectEl.textContent = currentState.cafe.assistantLevel > 0
+      ? `Автовыдача: 1 заказ каждые ${Math.max(1, 7 - currentState.cafe.assistantLevel)}с`
+      : 'Автовыдача: выключена';
+
     renderServeControls();
   }
 
@@ -404,6 +436,11 @@ async function bootstrap(): Promise<void> {
 
   ui.marketingBtn.addEventListener('click', () => {
     app.tryBuyMarketingUpgrade();
+    render();
+  });
+
+  ui.assistantBtn.addEventListener('click', () => {
+    app.tryBuyAssistantUpgrade();
     render();
   });
 
