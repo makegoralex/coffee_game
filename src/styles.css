@@ -299,7 +299,7 @@ body {
   border-top: 2px solid #1f252a;
   overflow: hidden;
   background-image:
-    linear-gradient(180deg, rgba(6, 12, 18, 0.3), rgba(5, 10, 14, 0.62)),
+    linear-gradient(180deg, rgba(8, 10, 12, 0.12), rgba(8, 12, 16, 0.36)),
     var(--lake-image);
   background-size: cover;
   background-position: center;
@@ -312,7 +312,7 @@ body {
   right: 0;
   bottom: 0;
   height: 53%;
-  background: linear-gradient(180deg, rgba(27, 57, 75, 0.22), rgba(11, 27, 36, 0.85));
+  background: linear-gradient(180deg, rgba(20, 49, 64, 0.08), rgba(10, 21, 29, 0.46));
 }
 
 
@@ -385,18 +385,23 @@ body {
 
 .rod {
   position: absolute;
+  left: 14%;
+  top: 84%;
   width: 30px;
   height: 370px;
   transform: translate(-50%, -6%);
   z-index: 2;
+  pointer-events: none;
 }
 
 .float {
+  --bobber-cut: 0;
   width: 10px;
   height: 24px;
   background: linear-gradient(#fff 0 45%, #d61912 45% 100%);
   border-radius: 6px;
   border: 1px solid #1d1d1d;
+  clip-path: inset(calc(var(--bobber-cut) * 80%) 0 0 0);
   transition: transform 0.15s ease;
 }
 
@@ -406,19 +411,26 @@ body {
   z-index: 3;
 }
 
-.bobber.underwater {
-  transform: translate(-50%, -28%);
-}
-
 .bobber.run {
   width: 20px;
   height: 8px;
   border-radius: 12px;
   transform: translate(-50%, -50%) rotate(-14deg);
+  clip-path: none;
 }
 
-.bobber.run.underwater {
-  transform: translate(-50%, -36%) rotate(-14deg);
+.bobber.hooked-run {
+  transform: translate(-50%, -60%) rotate(-14deg);
+}
+
+.bobber.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f4f6ff;
+  border: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 0 8px rgba(255, 255, 255, 0.45);
+  clip-path: none;
 }
 
 .line {

@@ -51,6 +51,7 @@ interface FishingState {
   lastPull: PullAction;
   floatX: number;
   floatY: number;
+  bobberCut: number;
 }
 
 const appEl = document.querySelector<HTMLDivElement>('#app');
@@ -115,6 +116,7 @@ let fishing: FishingState = {
   lastPull: null,
   floatX: 0,
   floatY: 0,
+  bobberCut: 0,
 };
 
 let gPressed = false;
@@ -193,6 +195,7 @@ function resetFightState(): void {
   fishing.lastPull = null;
   fishing.floatX = 0;
   fishing.floatY = 0;
+  fishing.bobberCut = 0;
   fishing.fish = null;
 }
 
@@ -290,6 +293,7 @@ function startCasting(x: number, y: number): void {
   rods = [{ id: rodId, castX: x, castY: y }];
   fishing.floatX = x;
   fishing.floatY = y;
+  fishing.bobberCut = 0;
 
   fishing.waitTimer = 2 + Math.random() * 3;
   fishing.fish = rollFishForLocation(getCurrentLocation());
@@ -504,10 +508,10 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
   return `
     <section class="screen fishing-screen" style="${location.sceneImage ? `--lake-image:url('${location.sceneImage}')` : ''}">
       <div class="water-overlay" id="water">
-        ${activeRod ? `<div class="rod" style="left:${activeRod.castX}%; top:${activeRod.castY}%"><div class="line"></div><div class="stick"></div></div>` : ''}
+        ${activeRod ? `<div class="rod"><div class="line"></div><div class="stick"></div></div>` : ''}
         ${
           activeRod
-            ? `<div id="bobber" class="float bobber ${fishing.phase === 'bite' || fishing.phase === 'hooked' ? 'underwater' : ''} ${fishing.phase === 'bite' && fishing.biteType === 'run' ? 'run' : ''}" style="left:${fishing.floatX}%; top:${fishing.floatY}%"></div>`
+            ? `<div id="bobber" class="float bobber ${fishing.phase === 'bite' && fishing.biteType === 'run' ? 'run' : ''} ${fishing.phase === 'hooked' && fishing.biteType === 'run' ? 'run hooked-run' : ''} ${fishing.phase === 'hooked' && fishing.biteType === 'sink' ? 'dot' : ''}" style="left:${fishing.floatX}%; top:${fishing.floatY}%; --bobber-cut:${fishing.bobberCut.toFixed(2)}"></div>`
             : ''
         }
       </div>
@@ -632,23 +636,27 @@ function updateFloatPosition(): void {
   const activeRod = rods[0];
   if (!activeRod || fishing.phase !== 'hooked') return;
 
-  const towardShore = fishing.catchProgress * 0.3;
-  const fishPushBack = (Math.sin(fishing.fightTimer * 2.1) + 1) * 2.4;
-  const sideDrift = Math.sin(fishing.fightTimer * 1.9) * 0.25;
+  const fishWeight = fishing.fish?.weight ?? 1;
+  const towardShore = fishing.catchProgress * 0.29;
+  const fishPushBack = (Math.sin(fishing.fightTimer * 2.1) + 1) * (2.2 + fishWeight * 0.22);
+  const sideDrift = Math.sin(fishing.fightTimer * (1.5 + fishWeight * 0.09)) * (1.5 + fishWeight * 0.28);
 
   fishing.floatY = Math.max(18, Math.min(82, activeRod.castY + towardShore - fishPushBack));
   fishing.floatX = Math.max(8, Math.min(92, activeRod.castX + sideDrift));
+  fishing.bobberCut = fishing.biteType === 'sink' ? 1 : 0;
 }
 
-function updateBiteAnimation(dt: number): void {
+function updateBiteAnimation(): void {
   const activeRod = rods[0];
   if (!activeRod || fishing.phase !== 'bite') return;
 
   if (fishing.biteType === 'sink') {
-    const shake = Math.sin(fishing.fightTimer * 36) * 0.5;
-    const deep = Math.max(0, 1.8 - fishing.biteTimer) * 1.1;
+    const shake = Math.sin(fishing.fightTimer * 36) * 0.18;
+    const pulse = (Math.sin(fishing.fightTimer * 24) + 1) * 0.5;
+    const deep = Math.max(0, 1.8 - fishing.biteTimer) * 0.48;
     fishing.floatX = activeRod.castX + shake;
-    fishing.floatY = Math.min(84, activeRod.castY + 0.7 + deep);
+    fishing.floatY = Math.min(84, activeRod.castY + deep);
+    fishing.bobberCut = Math.max(0.25, Math.min(0.9, 0.35 + pulse * 0.5 + deep * 0.16));
     return;
   }
 
@@ -656,6 +664,7 @@ function updateBiteAnimation(dt: number): void {
   const side = fishing.biteDirection * (runProgress * 9 + Math.sin(fishing.fightTimer * 18) * 0.6);
   fishing.floatX = Math.max(6, Math.min(94, activeRod.castX + side));
   fishing.floatY = Math.max(16, Math.min(82, activeRod.castY - 0.2 + Math.sin(fishing.fightTimer * 10) * 0.3));
+  fishing.bobberCut = 0;
 }
 
 function updateFishing(dt: number): void {
@@ -664,8 +673,9 @@ function updateFishing(dt: number): void {
   if (fishing.phase === 'waiting') {
     fishing.waitTimer -= dt;
     fishing.fightTimer += dt;
-    fishing.rodTension = 0.08 + Math.abs(Math.sin(fishing.fightTimer * 1.9)) * 0.06;
-    fishing.reelTension = 0.06 + Math.abs(Math.cos(fishing.fightTimer * 1.4)) * 0.05;
+    fishing.rodTension = 0;
+    fishing.reelTension = 0;
+    fishing.bobberCut = 0;
     if (fishing.waitTimer <= 0 && fishing.fish) {
       fishing.biteTimer = 1.8;
       fishing.biteType = Math.random() > 0.5 ? 'sink' : 'run';
@@ -680,9 +690,9 @@ function updateFishing(dt: number): void {
   if (fishing.phase === 'bite') {
     fishing.fightTimer += dt;
     fishing.biteTimer -= dt;
-    updateBiteAnimation(dt);
-    fishing.rodTension = 0.15 + Math.abs(Math.sin(fishing.fightTimer * 8.2)) * 0.24;
-    fishing.reelTension = 0.12 + Math.abs(Math.cos(fishing.fightTimer * 9.1)) * 0.2;
+    updateBiteAnimation();
+    fishing.rodTension = 0;
+    fishing.reelTension = 0;
     if (fishing.biteTimer <= 0) {
       setPhase('escaped');
       window.setTimeout(() => setPhase('idle'), 1200);
@@ -709,8 +719,10 @@ function updateFishing(dt: number): void {
   const reelLoadNow = fishBasePull + (hPressed ? 1.3 : 0.08) + (gPressed ? 0.15 : 0);
 
   fishing.currentLoad = (rodLoadNow + reelLoadNow) / 2;
-  fishing.rodTension = Math.max(0.07, Math.min(1, rodLoadNow / Math.max(0.5, rigStats.rodLoad)));
-  fishing.reelTension = Math.max(0.07, Math.min(1, reelLoadNow / Math.max(0.5, rigStats.reelLoad)));
+  const rodBase = Math.min(0.3, activeFish.weight * 0.03);
+  const reelBase = Math.min(0.26, activeFish.weight * 0.027);
+  fishing.rodTension = Math.max(rodBase, Math.min(1, rodLoadNow / Math.max(0.5, rigStats.rodLoad)));
+  fishing.reelTension = Math.max(reelBase, Math.min(1, reelLoadNow / Math.max(0.5, rigStats.reelLoad)));
 
   const isAlternatingBoost = (gPressed && fishing.lastPull === 'reel') || (hPressed && fishing.lastPull === 'rod');
   const rodPower = gPressed ? (isAlternatingBoost ? 21 : 11) : -2.2;
@@ -768,6 +780,7 @@ function renderHudOnly(): void {
   if (bobber) {
     bobber.style.left = `${fishing.floatX}%`;
     bobber.style.top = `${fishing.floatY}%`;
+    bobber.style.setProperty('--bobber-cut', `${fishing.bobberCut.toFixed(2)}`);
   }
 }
 
