@@ -390,7 +390,7 @@ function buyItem(itemId: string): void {
   render();
 }
 
-function buyConsumable(itemId: string): void {
+function applyConsumablePurchase(itemId: string): void {
   const item = CONSUMABLES.find((entry) => entry.id === itemId);
   if (!item || money < item.price) return;
 
@@ -400,17 +400,7 @@ function buyConsumable(itemId: string): void {
   render();
 }
 
-function buyConsumable(itemId: string): void {
-  const item = CONSUMABLES.find((entry) => entry.id === itemId);
-  if (!item || money < item.price) return;
-
-  money -= item.price;
-  playerFood = clamp01(playerFood + item.foodGain);
-  playerAlcohol = clamp01(playerAlcohol + item.alcoholGain);
-  render();
-}
-
-function equipItem(itemId: string): void {
+function applyEquipItem(itemId: string): void {
   const item = inventory.find((entry) => entry.id === itemId && entry.quantity > 0);
   if (!item) return;
   getActiveLoadout()[item.type] = item.id;
@@ -838,7 +828,7 @@ function bindEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-equip-id]').forEach((button) => {
     const itemId = button.dataset.equipId;
-    if (itemId) button.addEventListener('click', () => equipItem(itemId));
+    if (itemId) button.addEventListener('click', () => applyEquipItem(itemId));
   });
 
   document.querySelectorAll<HTMLButtonElement>('[data-buy-id]').forEach((button) => {
@@ -848,7 +838,7 @@ function bindEvents(): void {
 
   document.querySelectorAll<HTMLButtonElement>('[data-buy-consumable-id]').forEach((button) => {
     const itemId = button.dataset.buyConsumableId;
-    if (itemId) button.addEventListener('click', () => buyConsumable(itemId));
+    if (itemId) button.addEventListener('click', () => applyConsumablePurchase(itemId));
   });
 
   document.querySelector<HTMLDivElement>('#water')?.addEventListener('click', (event) => {
