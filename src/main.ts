@@ -217,6 +217,8 @@ let rafId = 0;
 let lastTs = performance.now();
 let debugVisible = false;
 let audioContext: AudioContext | null = null;
+let suppressRender = false;
+let suppressHudRender = false;
 
 function applyViewportScale(): void {
   // full-width layout, no additional scaling required
@@ -294,7 +296,7 @@ function sellKeepnet(): void {
   money += getKeepnetTotalPrice();
   keepnet = [];
   persistActiveFishingState();
-  render();
+  if (!suppressRender) render();
 }
 
 
@@ -333,36 +335,41 @@ function isRodReady(): boolean {
   return Boolean(getRigStats(loadout) && getInventoryItem(loadout.bait));
 }
 
+function clearFishingState(target: FishingState): void {
+  target.phase = 'idle';
+  target.biteTimer = 0;
+  target.biteType = 'sink';
+  target.biteDirection = 1;
+  target.waitTimer = 0;
+  target.fightTimer = 0;
+  target.catchProgress = 0;
+  target.currentLoad = 0;
+  target.rodOverload = 0;
+  target.reelOverload = 0;
+  target.rodTension = 0;
+  target.reelTension = 0;
+  target.fish = null;
+  target.lastPull = null;
+  target.floatX = 0;
+  target.floatY = 0;
+  target.bobberCut = 0;
+  target.fishDistance = 0;
+  target.fishStartDistance = 0;
+  target.fishVelocity = 0;
+  target.fishStamina = 0;
+  target.fishStaminaMax = 0;
+  target.escapeMeter = 0;
+  target.lineWear = 0;
+  target.rodWear = 0;
+  target.reelWear = 0;
+  target.fishPattern = 'struggle';
+  target.fishPatternTimer = 0;
+  target.rodCriticalHold = 0;
+  target.reelCriticalHold = 0;
+}
+
 function resetFightState(): void {
-  fishing.biteTimer = 0;
-  fishing.biteType = 'sink';
-  fishing.biteDirection = 1;
-  fishing.waitTimer = 0;
-  fishing.fightTimer = 0;
-  fishing.catchProgress = 0;
-  fishing.currentLoad = 0;
-  fishing.rodOverload = 0;
-  fishing.reelOverload = 0;
-  fishing.rodTension = 0;
-  fishing.reelTension = 0;
-  fishing.lastPull = null;
-  fishing.floatX = 0;
-  fishing.floatY = 0;
-  fishing.bobberCut = 0;
-  fishing.fishDistance = 0;
-  fishing.fishStartDistance = 0;
-  fishing.fishVelocity = 0;
-  fishing.fishStamina = 0;
-  fishing.fishStaminaMax = 0;
-  fishing.escapeMeter = 0;
-  fishing.lineWear = 0;
-  fishing.rodWear = 0;
-  fishing.reelWear = 0;
-  fishing.fishPattern = 'struggle';
-  fishing.fishPatternTimer = 0;
-  fishing.rodCriticalHold = 0;
-  fishing.reelCriticalHold = 0;
-  fishing.fish = null;
+  clearFishingState(fishing);
 }
 
 function setPhase(phase: FishingPhase, fishData?: CaughtFish): void {
@@ -375,7 +382,7 @@ function setPhase(phase: FishingPhase, fishData?: CaughtFish): void {
   }
 
   persistActiveFishingState();
-  render();
+  if (!suppressRender) render();
 }
 
 function removeOneItem(itemId: string): void {
@@ -418,7 +425,7 @@ function buyItem(itemId: string): void {
   const loadout = getActiveLoadout();
   if (!loadout[catalogItem.type]) loadout[catalogItem.type] = catalogItem.id;
   persistActiveFishingState();
-  render();
+  if (!suppressRender) render();
 }
 
 function applyConsumablePurchase(itemId: string): void {
@@ -429,7 +436,7 @@ function applyConsumablePurchase(itemId: string): void {
   playerFood = clamp01(playerFood + item.foodGain);
   playerAlcohol = clamp01(playerAlcohol + item.alcoholGain);
   persistActiveFishingState();
-  render();
+  if (!suppressRender) render();
 }
 
 function applyEquipItem(itemId: string): void {
@@ -437,7 +444,7 @@ function applyEquipItem(itemId: string): void {
   if (!item) return;
   getActiveLoadout()[item.type] = item.id;
   persistActiveFishingState();
-  render();
+  if (!suppressRender) render();
 }
 
 function createCaughtFish(species: FishSpecies, locationName: string): CaughtFish {
@@ -516,7 +523,14 @@ function prepareWaitingState(target: FishingState, x: number, y: number): void {
 function startCasting(x: number, y: number): void {
   if (!canStartFishing()) return;
   if (!isRodReady()) return;
-  if (hasRodInSlot(activeRodSlot) || rods.length >= 3) return;
+  if (hasRodInSlot(activeRodSlot)) {
+    rods = rods.filter((rod) => rod.rodSlot !== activeRodSlot);
+    const slotState = cloneFishingState(slotFishingStates[activeRodSlot]);
+    clearFishingState(slotState);
+    slotFishingStates[activeRodSlot] = slotState;
+    clearFishingState(fishing);
+  }
+  if (rods.length >= 3) return;
   const bait = getInventoryItem(getActiveLoadout().bait);
   if (!bait) return;
 
@@ -738,23 +752,21 @@ function renderMapScreen(): string {
 function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; finalLoad: number } | null): string {
   const activeRod = getCastRod();
   const location = getCurrentLocation();
-  const fishMarker = getFishMarkerPosition();
 
   return `
     <section class="screen fishing-screen" style="${location.sceneImage ? `--lake-image:url('${location.sceneImage}')` : ''}">
       <div class="water-overlay" id="water">
         <div class="shore-rods">${[0, 1, 2].map((slot) => `<button class="shore-rod ${slot === activeRodSlot ? 'active' : ''} ${hasRodInSlot(slot) ? 'casted' : ''}" data-rod-slot="${slot}" title="Удочка ${slot + 1}">${slot + 1}</button>`).join('')}</div>
         ${rods.map((rod) => `<button class="rod ${rod.rodSlot === activeRodSlot ? 'rod--active' : ''}" data-rod-slot="${rod.rodSlot}" style="left:${rod.castX}%;"><div class="line"></div><div class="stick"></div></button>`).join('')}
-        ${
-          activeRod
-            ? `<div id="bobber" class="float bobber ${fishing.phase === 'bite' && fishing.biteType === 'run' ? 'run' : ''} ${fishing.phase === 'bite' && fishing.biteType === 'sink' ? 'bite-sink' : ''} ${fishing.phase === 'hooked' && fishing.biteType === 'run' ? 'run hooked-run' : ''} ${fishing.phase === 'hooked' && fishing.biteType === 'sink' ? 'dot' : ''}" style="left:${fishing.floatX}%; top:${fishing.floatY}%; --bobber-cut:${fishing.bobberCut.toFixed(2)}"></div>`
-            : ''
-        }
-        ${
-          fishMarker
-            ? `<div id="fish-marker" class="fish-marker" style="left:${fishMarker.x.toFixed(2)}%; top:${fishMarker.y.toFixed(2)}%"></div>`
-            : ''
-        }
+        ${rods
+          .map((rod) => {
+            const state = slotFishingStates[rod.rodSlot] ?? fishing;
+            if (state.phase !== 'waiting' && state.phase !== 'bite' && state.phase !== 'hooked') return '';
+            const bobberClass = `${state.phase === 'bite' && state.biteType === 'run' ? 'run' : ''} ${state.phase === 'bite' && state.biteType === 'sink' ? 'bite-sink' : ''} ${state.phase === 'hooked' && state.biteType === 'run' ? 'run hooked-run' : ''} ${state.phase === 'hooked' && state.biteType === 'sink' ? 'dot' : ''}`;
+            const marker = getFishMarkerPositionFor(rod, state);
+            return `${rod.rodSlot === activeRodSlot ? '<div id="bobber" ' : '<div '}class="float bobber ${bobberClass}" style="left:${state.floatX}%; top:${state.floatY}%; --bobber-cut:${state.bobberCut.toFixed(2)}"></div>${marker ? `${rod.rodSlot === activeRodSlot ? '<div id="fish-marker" ' : '<div '}class="fish-marker" style="left:${marker.x.toFixed(2)}%; top:${marker.y.toFixed(2)}%"></div>` : ''}`;
+          })
+          .join('')}
       </div>
 
       <div class="rod-slot-strip">${rodLoadouts.map((_, i) => `<button class="rod-slot-btn ${i === activeRodSlot ? 'active' : ''}" data-rod-slot="${i}">Удочка ${i + 1}</button>`).join('')}</div><div class="tension-widget">
@@ -918,31 +930,36 @@ function updateFloatPosition(): void {
   fishing.bobberCut = fishing.biteType === 'sink' ? 1 : 0;
 }
 
-function getFishMarkerPosition(): { x: number; y: number } | null {
-  const activeRod = getCastRod();
-  if (!activeRod || fishing.phase !== 'hooked') return null;
+function getFishMarkerPositionFor(rod: Rod, state: FishingState): { x: number; y: number } | null {
+  if (state.phase !== 'hooked') return null;
 
-  const maxDistance = Math.max(1, fishing.fishStartDistance);
-  const distanceRatio = Math.max(0, Math.min(1, fishing.fishDistance / maxDistance));
-  const tensionGrip = Math.max(fishing.rodTension, fishing.reelTension);
+  const maxDistance = Math.max(1, state.fishStartDistance);
+  const distanceRatio = Math.max(0, Math.min(1, state.fishDistance / maxDistance));
+  const tensionGrip = Math.max(state.rodTension, state.reelTension);
   const pullInput = (gPressed ? 1 : 0) + (hPressed ? 1 : 0);
   const pullSuppression = pullInput > 0 ? 0.35 : 1;
   const lateralSuppression = (1 - tensionGrip * 0.78) * pullSuppression;
   const progressToShore = 1 - distanceRatio;
   const lateralDrift =
-    fishing.fishPattern === 'run'
-      ? Math.sin(fishing.fightTimer * 4.4) * 4.2 * lateralSuppression
-      : fishing.fishPattern === 'headshake'
-        ? Math.sin(fishing.fightTimer * 8.6) * 2.4 * lateralSuppression
-        : Math.sin(fishing.fightTimer * 1.8) * 1.4 * lateralSuppression;
-  const wave = Math.sin(fishing.fightTimer * 2.4) * (0.3 + fishing.fishVelocity * 0.2);
+    state.fishPattern === 'run'
+      ? Math.sin(state.fightTimer * 4.4) * 4.2 * lateralSuppression
+      : state.fishPattern === 'headshake'
+        ? Math.sin(state.fightTimer * 8.6) * 2.4 * lateralSuppression
+        : Math.sin(state.fightTimer * 1.8) * 1.4 * lateralSuppression;
+  const wave = Math.sin(state.fightTimer * 2.4) * (0.3 + state.fishVelocity * 0.2);
 
-  const x = Math.max(6, Math.min(94, activeRod.castX + lateralDrift));
-  const farY = Math.max(16, activeRod.castY - 4);
+  const x = Math.max(6, Math.min(94, rod.castX + lateralDrift));
+  const farY = Math.max(16, rod.castY - 4);
   const shoreY = 85.5;
   const y = Math.max(12, Math.min(87, farY + progressToShore * (shoreY - farY) + wave));
 
   return { x, y };
+}
+
+function getFishMarkerPosition(): { x: number; y: number } | null {
+  const activeRod = getCastRod();
+  if (!activeRod) return null;
+  return getFishMarkerPositionFor(activeRod, fishing);
 }
 
 function updateBiteAnimation(): void {
@@ -1013,7 +1030,7 @@ function updateFishing(dt: number): void {
       playBiteSignal();
       setPhase('bite', fishing.fish);
     }
-    renderHudOnly();
+    if (!suppressHudRender) renderHudOnly();
     return;
   }
 
@@ -1027,7 +1044,7 @@ function updateFishing(dt: number): void {
       setPhase('escaped');
       window.setTimeout(() => setPhase('idle'), 1200);
     }
-    renderHudOnly();
+    if (!suppressHudRender) renderHudOnly();
     return;
   }
 
@@ -1189,7 +1206,7 @@ function updateFishing(dt: number): void {
   }
 
   persistActiveFishingState();
-  renderHudOnly();
+  if (!suppressHudRender) renderHudOnly();
 }
 
 function renderHudOnly(): void {
@@ -1223,7 +1240,29 @@ function gameLoop(ts: number): void {
   const dt = Math.min((ts - lastTs) / 1000, 0.05);
   lastTs = ts;
   updateGameClock(dt);
-  updateFishing(dt);
+
+  if (screen === 'fishing' && rods.length > 0) {
+    const selectedSlot = activeRodSlot;
+    suppressRender = true;
+    suppressHudRender = true;
+
+    for (let slot = 0; slot < 3; slot += 1) {
+      if (!hasRodInSlot(slot)) continue;
+      activeRodSlot = slot;
+      fishing = cloneFishingState(slotFishingStates[slot]);
+      updateFishing(dt);
+      slotFishingStates[slot] = cloneFishingState(fishing);
+    }
+
+    suppressRender = false;
+    suppressHudRender = false;
+    activeRodSlot = selectedSlot;
+    fishing = cloneFishingState(slotFishingStates[selectedSlot]);
+    renderHudOnly();
+  } else {
+    updateFishing(dt);
+  }
+
   rafId = requestAnimationFrame(gameLoop);
 }
 
