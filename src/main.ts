@@ -605,6 +605,7 @@ function renderMapScreen(): string {
 function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; finalLoad: number } | null): string {
   const activeRod = rods[0];
   const location = getCurrentLocation();
+  const fishMarker = getFishMarkerPosition();
 
   return `
     <section class="screen fishing-screen" style="${location.sceneImage ? `--lake-image:url('${location.sceneImage}')` : ''}">
@@ -613,6 +614,11 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
         ${
           activeRod
             ? `<div id="bobber" class="float bobber ${fishing.phase === 'bite' && fishing.biteType === 'run' ? 'run' : ''} ${fishing.phase === 'bite' && fishing.biteType === 'sink' ? 'bite-sink' : ''} ${fishing.phase === 'hooked' && fishing.biteType === 'run' ? 'run hooked-run' : ''} ${fishing.phase === 'hooked' && fishing.biteType === 'sink' ? 'dot' : ''}" style="left:${fishing.floatX}%; top:${fishing.floatY}%; --bobber-cut:${fishing.bobberCut.toFixed(2)}"></div>`
+            : ''
+        }
+        ${
+          fishMarker
+            ? `<div id="fish-marker" class="fish-marker" style="left:${fishMarker.x.toFixed(2)}%; top:${fishMarker.y.toFixed(2)}%"></div>`
             : ''
         }
       </div>
@@ -751,6 +757,29 @@ function updateFloatPosition(): void {
   fishing.floatX = Math.max(8, Math.min(92, activeRod.castX + patternDrift));
   fishing.floatY = Math.max(16, Math.min(82, activeRod.castY + distanceRatio * 3.2 - towardShore * 0.25 + wave));
   fishing.bobberCut = fishing.biteType === 'sink' ? 1 : 0;
+}
+
+function getFishMarkerPosition(): { x: number; y: number } | null {
+  const activeRod = rods[0];
+  if (!activeRod || fishing.phase !== 'hooked') return null;
+
+  const maxDistance = Math.max(1, fishing.fishStartDistance);
+  const distanceRatio = Math.max(0, Math.min(1, fishing.fishDistance / maxDistance));
+  const progressToShore = 1 - distanceRatio;
+  const lateralDrift =
+    fishing.fishPattern === 'run'
+      ? Math.sin(fishing.fightTimer * 4.4) * 4.2
+      : fishing.fishPattern === 'headshake'
+        ? Math.sin(fishing.fightTimer * 8.6) * 2.4
+        : Math.sin(fishing.fightTimer * 1.8) * 1.4;
+  const wave = Math.sin(fishing.fightTimer * 2.4) * (0.3 + fishing.fishVelocity * 0.2);
+
+  const x = Math.max(6, Math.min(94, activeRod.castX + lateralDrift));
+  const farY = Math.max(16, activeRod.castY - 4);
+  const shoreY = 85.5;
+  const y = Math.max(12, Math.min(87, farY + progressToShore * (shoreY - farY) + wave));
+
+  return { x, y };
 }
 
 function updateBiteAnimation(): void {
@@ -969,7 +998,7 @@ function updateFishing(dt: number): void {
     return;
   }
 
-  if (fishing.fishDistance <= 0.9) {
+  if (fishing.catchProgress >= 99.5 || fishing.fishDistance <= 1.6) {
     totalFishCaught += 1;
     keepnet.push(activeFish);
     setPhase('landed', activeFish);
@@ -987,6 +1016,7 @@ function renderHudOnly(): void {
   const rodLoadBar = document.querySelector<HTMLDivElement>('#rod-load-bar');
   const reelLoadBar = document.querySelector<HTMLDivElement>('#reel-load-bar');
   const bobber = document.querySelector<HTMLDivElement>('#bobber');
+  const fishMarker = document.querySelector<HTMLDivElement>('#fish-marker');
 
   if (rodLoadBar) rodLoadBar.style.width = `${Math.max(0, Math.min(100, fishing.rodTension * 100)).toFixed(0)}%`;
   if (reelLoadBar) reelLoadBar.style.width = `${Math.max(0, Math.min(100, fishing.reelTension * 100)).toFixed(0)}%`;
@@ -995,6 +1025,17 @@ function renderHudOnly(): void {
     bobber.style.left = `${fishing.floatX}%`;
     bobber.style.top = `${fishing.floatY}%`;
     bobber.style.setProperty('--bobber-cut', `${fishing.bobberCut.toFixed(2)}`);
+  }
+
+  if (fishMarker) {
+    const markerPosition = getFishMarkerPosition();
+    if (!markerPosition) {
+      fishMarker.style.display = 'none';
+    } else {
+      fishMarker.style.display = 'block';
+      fishMarker.style.left = `${markerPosition.x.toFixed(2)}%`;
+      fishMarker.style.top = `${markerPosition.y.toFixed(2)}%`;
+    }
   }
 }
 
