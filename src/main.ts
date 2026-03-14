@@ -765,7 +765,9 @@ function getFishMarkerPosition(): { x: number; y: number } | null {
   const maxDistance = Math.max(1, fishing.fishStartDistance);
   const distanceRatio = Math.max(0, Math.min(1, fishing.fishDistance / maxDistance));
   const tensionGrip = Math.max(fishing.rodTension, fishing.reelTension);
-  const lateralSuppression = 1 - tensionGrip * 0.78;
+  const pullInput = (gPressed ? 1 : 0) + (hPressed ? 1 : 0);
+  const pullSuppression = pullInput > 0 ? 0.35 : 1;
+  const lateralSuppression = (1 - tensionGrip * 0.78) * pullSuppression;
   const progressToShore = 1 - distanceRatio;
   const lateralDrift =
     fishing.fishPattern === 'run'
@@ -944,8 +946,8 @@ function updateFishing(dt: number): void {
       ? (0.28 + (1 - Math.min(1, staminaRatio)) * 0.42 + tensionGrip * 0.32) * dt
       : 0;
   const distanceAfterControl = controlDelta - steadyPullToShore - coordinatedPullBonus;
-  const guaranteedPullToShore =
-    pullInput > 0 ? (0.14 + pullInput * 0.2 + (bothPulling ? 0.34 : 0) + tensionGrip * 0.26) * dt : 0;
+  const guaranteedPullSpeed = pullInput > 0 ? 2.4 + pullInput * 1.45 + (bothPulling ? 2.35 : 0) + tensionGrip * 1.15 : 0;
+  const guaranteedPullToShore = guaranteedPullSpeed * dt;
   const distanceDelta = pullInput > 0 ? Math.min(distanceAfterControl, -guaranteedPullToShore) : distanceAfterControl;
 
   fishing.fishDistance = Math.max(0, Math.min(fishing.fishStartDistance * 1.7, fishing.fishDistance + distanceDelta));
