@@ -106,10 +106,11 @@ body {
 }
 
 .book-title {
-  font-size: 58px;
+  font-size: 42px;
   text-align: center;
-  font-family: 'Brush Script MT', cursive;
-  margin-bottom: 20px;
+  font-weight: 800;
+  margin-bottom: 18px;
+  letter-spacing: 0.3px;
 }
 
 .book-panel ul {
@@ -119,18 +120,22 @@ body {
 }
 
 .book-panel li {
-  font-size: 42px;
+  font-size: 24px;
   margin-bottom: 12px;
-  font-family: 'Brush Script MT', cursive;
+  line-height: 1.35;
 }
 
 .right-sidebar {
   background: linear-gradient(180deg, #1b3045 0%, #19293b 100%);
   padding: 10px;
   display: grid;
-  grid-template-rows: 132px 60px 40px 1fr;
+  grid-template-rows: 60px 1fr;
   gap: 10px;
   min-height: 0;
+}
+
+.right-sidebar.compact {
+  grid-template-rows: 60px 1fr;
 }
 
 .depth-widget {
@@ -665,4 +670,95 @@ body {
 
 .status-item:nth-child(2) .bar i {
   background: linear-gradient(180deg, #ff9b84 0%, #d24a35 100%);
+}
+
+.rod-slot-strip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 82px;
+  z-index: 6;
+  display: flex;
+  gap: 8px;
+}
+
+.rod-slot-btn {
+  border: 1px solid rgba(255,255,255,0.28);
+  background: rgba(8, 16, 24, 0.74);
+  color: #d9e8ff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rod-slot-btn.active {
+  background: linear-gradient(180deg, #5b86b4 0%, #39648f 100%);
+  color: #fff;
+}
+
+.utility-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+}
+
+.utility-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 8, 14, 0.56);
+}
+
+.utility-modal-content {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(860px, 90vw);
+  max-height: 76vh;
+  overflow: auto;
+  background: #e7eef7;
+  border: 1px solid #7f9dbc;
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.3);
+}
+
+.utility-modal-close {
+  position: sticky;
+  float: right;
+  top: 0;
+  border: 1px solid #5f7994;
+  background: #1e3348;
+  color: #fff;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+}
+
+.shore-rods {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  z-index: 7;
+}
+
+.shore-rod {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.4);
+  background: rgba(5, 12, 18, 0.78);
+  color: #d2e4ff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.shore-rod.active {
+  background: linear-gradient(180deg, #82b8ea 0%, #4a7fb1 100%);
+  color: #fff;
 }
