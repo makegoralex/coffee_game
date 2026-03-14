@@ -296,7 +296,11 @@ function getRigStatsForSlot(slot: number): { rodLoad: number; reelLoad: number; 
 }
 
 function getCastRod(): Rod | null {
-  return rods[0] ?? null;
+  return rods.find((rod) => rod.rodSlot === activeRodSlot) ?? null;
+}
+
+function hasRodInSlot(slot: number): boolean {
+  return rods.some((rod) => rod.rodSlot === slot);
 }
 
 function isRodReady(): boolean {
@@ -342,7 +346,7 @@ function setPhase(phase: FishingPhase, fishData?: CaughtFish): void {
 
   if (phase === 'idle') {
     resetFightState();
-    rods = [];
+    rods = rods.filter((rod) => rod.rodSlot !== activeRodSlot);
   }
 
   render();
@@ -453,13 +457,20 @@ function rollFishForLocation(location: LocationData): CaughtFish {
 function startCasting(x: number, y: number): void {
   if (!canStartFishing()) return;
   if (!isRodReady()) return;
+  if (hasRodInSlot(activeRodSlot) || rods.length >= 3) return;
   const bait = getInventoryItem(getActiveLoadout().bait);
   if (!bait) return;
 
   removeOneItem(bait.id);
 
   rodId += 1;
-  rods = [{ id: rodId, castX: x, castY: y, rodSlot: activeRodSlot }];
+  rods.push({ id: rodId, castX: x, castY: y, rodSlot: activeRodSlot });
+
+  if (fishing.phase !== 'idle') {
+    render();
+    return;
+  }
+
   fishing.floatX = x;
   fishing.floatY = y;
   fishing.bobberCut = 0;
@@ -629,6 +640,7 @@ function render(): void {
               <small>Садок: ${keepnet.length} шт, ${formatMoney(keepnetTotal)}</small>
               <small>Удилище: ${rigStats ? `${rigStats.rodLoad.toFixed(1)} кг` : '—'} | Катушка: ${rigStats ? `${rigStats.reelLoad.toFixed(1)} кг` : '—'}</small>
               <small>${canStartFishing() ? 'Состояние: можно ловить' : 'Состояние: голоден, нужно поесть'}</small>
+              <small>Удочки в воде: ${rods.length} / 3</small>
               <button class="sell-btn" id="sell-keepnet-btn" ${keepnet.length === 0 ? 'disabled' : ''}>Продать садок</button>
             </div>
           </aside>
@@ -696,8 +708,8 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
   return `
     <section class="screen fishing-screen" style="${location.sceneImage ? `--lake-image:url('${location.sceneImage}')` : ''}">
       <div class="water-overlay" id="water">
-        <div class="shore-rods">${[0, 1, 2].map((slot) => `<button class="shore-rod ${slot === activeRodSlot ? 'active' : ''}" data-rod-slot="${slot}" title="Удочка ${slot + 1}">${slot + 1}</button>`).join('')}</div>
-        ${activeRod ? `<div class="rod" style="left:${activeRod.castX}%;"><div class="line"></div><div class="stick"></div></div>` : ''}
+        <div class="shore-rods">${[0, 1, 2].map((slot) => `<button class="shore-rod ${slot === activeRodSlot ? 'active' : ''} ${hasRodInSlot(slot) ? 'casted' : ''}" data-rod-slot="${slot}" title="Удочка ${slot + 1}">${slot + 1}</button>`).join('')}</div>
+        ${rods.map((rod) => `<button class="rod ${rod.rodSlot === activeRodSlot ? 'rod--active' : ''}" data-rod-slot="${rod.rodSlot}" style="left:${rod.castX}%;"><div class="line"></div><div class="stick"></div></button>`).join('')}
         ${
           activeRod
             ? `<div id="bobber" class="float bobber ${fishing.phase === 'bite' && fishing.biteType === 'run' ? 'run' : ''} ${fishing.phase === 'bite' && fishing.biteType === 'sink' ? 'bite-sink' : ''} ${fishing.phase === 'hooked' && fishing.biteType === 'run' ? 'run hooked-run' : ''} ${fishing.phase === 'hooked' && fishing.biteType === 'sink' ? 'dot' : ''}" style="left:${fishing.floatX}%; top:${fishing.floatY}%; --bobber-cut:${fishing.bobberCut.toFixed(2)}"></div>`
@@ -842,7 +854,7 @@ function bindEvents(): void {
   });
 
   document.querySelector<HTMLDivElement>('#water')?.addEventListener('click', (event) => {
-    if (fishing.phase !== 'idle') return;
+    if (fishing.phase === 'hooked') return;
     const water = event.currentTarget as HTMLDivElement;
     const rect = water.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * 100;
@@ -1083,16 +1095,16 @@ function updateFishing(dt: number): void {
     fishing.escapeMeter = Math.max(0, fishing.escapeMeter - 13 * dt);
   }
 
-  const danger = Math.max(0, tensionRatio - 0.85);
-  const critical = Math.max(0, tensionRatio - 1);
-  fishing.lineWear = Math.min(100, fishing.lineWear + (danger * 16 + critical * 42 + (fishing.fishPattern === 'run' ? 2.2 : 0)) * dt);
+  const danger = Math.max(0, tensionRatio - 0.93);
+  const critical = Math.max(0, tensionRatio - 1.12);
+  fishing.lineWear = Math.min(100, fishing.lineWear + (danger * 8 + critical * 24 + (fishing.fishPattern === 'run' ? 1.1 : 0)) * dt);
   if (gPressed) {
-    fishing.rodWear = Math.min(100, fishing.rodWear + (danger * 14 + critical * 36 + (fishing.fishPattern === 'deeppull' ? 2.8 : 0)) * dt);
+    fishing.rodWear = Math.min(100, fishing.rodWear + (danger * 7 + critical * 20 + (fishing.fishPattern === 'deeppull' ? 1.3 : 0)) * dt);
   }
   if (hPressed) {
-    fishing.reelWear = Math.min(100, fishing.reelWear + (danger * 15 + critical * 40 + (fishing.fishPattern === 'run' ? 2.5 : 0)) * dt);
+    fishing.reelWear = Math.min(100, fishing.reelWear + (danger * 7.5 + critical * 22 + (fishing.fishPattern === 'run' ? 1.2 : 0)) * dt);
     if (!gPressed && fishForce > rodForce + reelForce) {
-      fishing.reelWear = Math.min(100, fishing.reelWear + 3.8 * dt);
+      fishing.reelWear = Math.min(100, fishing.reelWear + 1.8 * dt);
     }
   }
 
@@ -1118,7 +1130,7 @@ function updateFishing(dt: number): void {
     return;
   }
 
-  const criticalBreakDelay = 2.8;
+  const criticalBreakDelay = 5.2;
   if (fishing.rodCriticalHold >= criticalBreakDelay || fishing.reelCriticalHold >= criticalBreakDelay) {
     if (fishing.rodTension >= fishing.reelTension) breakRigPart('rod');
     else breakRigPart('reel');

@@ -394,7 +394,15 @@ body {
   height: 370px;
   transform: translate(-50%, -6%);
   z-index: 3;
-  pointer-events: none;
+  pointer-events: auto;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.rod.rod--active .stick {
+  box-shadow: 0 0 0 2px rgba(131, 190, 255, 0.85);
 }
 
 .float {
@@ -674,9 +682,9 @@ body {
 
 .rod-slot-strip {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 82px;
+  left: 16px;
+  transform: none;
+  top: 16px;
   z-index: 6;
   display: flex;
   gap: 8px;
@@ -761,4 +769,8 @@ body {
 .shore-rod.active {
   background: linear-gradient(180deg, #82b8ea 0%, #4a7fb1 100%);
   color: #fff;
+}
+
+.shore-rod.casted {
+  box-shadow: 0 0 0 2px rgba(140, 242, 166, 0.8);
 }
