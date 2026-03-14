@@ -936,13 +936,18 @@ function updateFishing(dt: number): void {
 
   const fishWeightResistance = Math.max(0.55, Math.min(2.1, activeFish.weight / Math.max(0.8, rigStats.finalLoad) + 0.7));
   const pullInput = (gPressed ? 1 : 0) + (hPressed ? 1 : 0);
+  const bothPulling = gPressed && hPressed;
   const tensionGrip = Math.max(fishing.rodTension, fishing.reelTension);
   const playerTowardShore = playerControl * (0.85 + pullInput * 0.18) / fishWeightResistance;
   const fishPushAway = fishControl * (0.65 + fishWeightResistance * 0.35);
   const controlDelta = (fishPushAway - playerTowardShore) * dt * 0.56;
   const tensionPullBoost = 0.08 + tensionGrip * 0.24;
-  const steadyPullToShore = pullInput > 0 ? (0.16 + (2.2 - fishWeightResistance) * 0.065 + tensionPullBoost) * pullInput * dt : 0;
-  const distanceDelta = controlDelta - steadyPullToShore;
+  const steadyPullToShore = pullInput > 0 ? (0.22 + (2.2 - fishWeightResistance) * 0.09 + tensionPullBoost) * pullInput * dt : 0;
+  const coordinatedPullBonus =
+    bothPulling && tensionRatio >= 0.25
+      ? (0.28 + (1 - Math.min(1, staminaRatio)) * 0.42 + tensionGrip * 0.32) * dt
+      : 0;
+  const distanceDelta = controlDelta - steadyPullToShore - coordinatedPullBonus;
 
   fishing.fishDistance = Math.max(0, Math.min(fishing.fishStartDistance * 1.7, fishing.fishDistance + distanceDelta));
   fishing.fishVelocity = fishing.fishVelocity * 0.74 + Math.abs(distanceDelta) * 0.26;
