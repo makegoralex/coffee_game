@@ -73,6 +73,8 @@ interface FishingState {
   dragSetting: number;
   fishPattern: FishFightPattern;
   fishPatternTimer: number;
+  rodCriticalHold: number;
+  reelCriticalHold: number;
 }
 
 const appEl = document.querySelector<HTMLDivElement>('#app');
@@ -154,6 +156,8 @@ let fishing: FishingState = {
   dragSetting: 0.55,
   fishPattern: 'struggle',
   fishPatternTimer: 0,
+  rodCriticalHold: 0,
+  reelCriticalHold: 0,
 };
 
 let gPressed = false;
@@ -262,6 +266,8 @@ function resetFightState(): void {
   fishing.dragSetting = 0.55;
   fishing.fishPattern = 'struggle';
   fishing.fishPatternTimer = 0;
+  fishing.rodCriticalHold = 0;
+  fishing.reelCriticalHold = 0;
   fishing.fish = null;
 }
 
@@ -293,6 +299,12 @@ function breakCurrentRig(): void {
   [equipped.rod, equipped.reel, equipped.line].forEach((id) => {
     if (id) removeOneItem(id);
   });
+}
+
+function breakRigPart(part: 'rod' | 'reel' | 'line'): void {
+  const itemId = equipped[part];
+  if (!itemId) return;
+  removeOneItem(itemId);
 }
 
 function buyItem(itemId: string): void {
@@ -392,6 +404,8 @@ function startCasting(x: number, y: number): void {
   fishing.reelWear = 0;
   fishing.fishPattern = 'struggle';
   fishing.fishPatternTimer = 0;
+  fishing.rodCriticalHold = 0;
+  fishing.reelCriticalHold = 0;
 
   setPhase('waiting');
 }
@@ -591,6 +605,7 @@ function renderMapScreen(): string {
 function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; finalLoad: number } | null): string {
   const activeRod = rods[0];
   const location = getCurrentLocation();
+  const fishMarker = getFishMarkerPosition();
 
   return `
     <section class="screen fishing-screen" style="${location.sceneImage ? `--lake-image:url('${location.sceneImage}')` : ''}">
@@ -599,6 +614,11 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
         ${
           activeRod
             ? `<div id="bobber" class="float bobber ${fishing.phase === 'bite' && fishing.biteType === 'run' ? 'run' : ''} ${fishing.phase === 'bite' && fishing.biteType === 'sink' ? 'bite-sink' : ''} ${fishing.phase === 'hooked' && fishing.biteType === 'run' ? 'run hooked-run' : ''} ${fishing.phase === 'hooked' && fishing.biteType === 'sink' ? 'dot' : ''}" style="left:${fishing.floatX}%; top:${fishing.floatY}%; --bobber-cut:${fishing.bobberCut.toFixed(2)}"></div>`
+            : ''
+        }
+        ${
+          fishMarker
+            ? `<div id="fish-marker" class="fish-marker" style="left:${fishMarker.x.toFixed(2)}%; top:${fishMarker.y.toFixed(2)}%"></div>`
             : ''
         }
       </div>
@@ -725,18 +745,45 @@ function updateFloatPosition(): void {
 
   const maxDistance = Math.max(1, fishing.fishStartDistance);
   const distanceRatio = Math.max(0, Math.min(1, fishing.fishDistance / maxDistance));
+  const tensionGrip = Math.max(fishing.rodTension, fishing.reelTension);
+  const lateralSuppression = 1 - tensionGrip * 0.72;
   const towardShore = (1 - distanceRatio) * 18;
   const wave = Math.sin(fishing.fightTimer * 2.2) * (1.1 + fishing.fishVelocity * 0.35);
   const patternDrift =
     fishing.fishPattern === 'run'
-      ? Math.sin(fishing.fightTimer * 4.4) * 4.8
+      ? Math.sin(fishing.fightTimer * 4.4) * 4.8 * lateralSuppression
       : fishing.fishPattern === 'headshake'
-        ? Math.sin(fishing.fightTimer * 9.8) * 2.7
-        : Math.sin(fishing.fightTimer * 1.6) * 1.2;
+        ? Math.sin(fishing.fightTimer * 9.8) * 2.7 * lateralSuppression
+        : Math.sin(fishing.fightTimer * 1.6) * 1.2 * lateralSuppression;
 
   fishing.floatX = Math.max(8, Math.min(92, activeRod.castX + patternDrift));
   fishing.floatY = Math.max(16, Math.min(82, activeRod.castY + distanceRatio * 3.2 - towardShore * 0.25 + wave));
   fishing.bobberCut = fishing.biteType === 'sink' ? 1 : 0;
+}
+
+function getFishMarkerPosition(): { x: number; y: number } | null {
+  const activeRod = rods[0];
+  if (!activeRod || fishing.phase !== 'hooked') return null;
+
+  const maxDistance = Math.max(1, fishing.fishStartDistance);
+  const distanceRatio = Math.max(0, Math.min(1, fishing.fishDistance / maxDistance));
+  const tensionGrip = Math.max(fishing.rodTension, fishing.reelTension);
+  const lateralSuppression = 1 - tensionGrip * 0.78;
+  const progressToShore = 1 - distanceRatio;
+  const lateralDrift =
+    fishing.fishPattern === 'run'
+      ? Math.sin(fishing.fightTimer * 4.4) * 4.2 * lateralSuppression
+      : fishing.fishPattern === 'headshake'
+        ? Math.sin(fishing.fightTimer * 8.6) * 2.4 * lateralSuppression
+        : Math.sin(fishing.fightTimer * 1.8) * 1.4 * lateralSuppression;
+  const wave = Math.sin(fishing.fightTimer * 2.4) * (0.3 + fishing.fishVelocity * 0.2);
+
+  const x = Math.max(6, Math.min(94, activeRod.castX + lateralDrift));
+  const farY = Math.max(16, activeRod.castY - 4);
+  const shoreY = 85.5;
+  const y = Math.max(12, Math.min(87, farY + progressToShore * (shoreY - farY) + wave));
+
+  return { x, y };
 }
 
 function updateBiteAnimation(): void {
@@ -857,15 +904,45 @@ function updateFishing(dt: number): void {
 
   const rawTensionKg = Math.max(0, fishForce + rodForce + reelForce - dragRelief);
   const tensionRatio = rawTensionKg / Math.max(0.75, rigStats.finalLoad);
+  const fishToRigRatio = Math.max(0.35, activeFish.weight / Math.max(0.6, rigStats.finalLoad));
+  const pressureFactor = Math.max(0.2, fishForce / Math.max(0.5, rigStats.finalLoad));
+  const overloadGainBase = Math.max(0.04, (fishToRigRatio * 0.16 + pressureFactor * 0.12 + Math.max(0, tensionRatio - 0.52) * 0.3));
+  const overloadDecayBase = 0.2 + Math.max(0, 0.35 - fishToRigRatio) * 0.35;
+
+  const rodPressure = rawTensionKg / Math.max(0.55, rigStats.rodLoad);
+  const reelPressure = rawTensionKg / Math.max(0.55, rigStats.reelLoad);
 
   fishing.currentLoad = rawTensionKg;
-  fishing.rodTension = gPressed ? Math.max(0.05, Math.min(1, rawTensionKg / Math.max(0.55, rigStats.rodLoad))) : 0;
-  fishing.reelTension = hPressed ? Math.max(0.05, Math.min(1, rawTensionKg / Math.max(0.55, rigStats.reelLoad))) : 0;
+
+  if (gPressed) {
+    const rodGain = overloadGainBase * (0.55 + Math.min(1.8, rodPressure));
+    fishing.rodTension = Math.min(1, fishing.rodTension + rodGain * dt);
+  } else {
+    const rodDecay = overloadDecayBase * (0.85 + fishing.rodTension);
+    fishing.rodTension = Math.max(0, fishing.rodTension - rodDecay * dt);
+  }
+
+  if (hPressed) {
+    const reelGain = overloadGainBase * (0.55 + Math.min(1.8, reelPressure));
+    fishing.reelTension = Math.min(1, fishing.reelTension + reelGain * dt);
+  } else {
+    const reelDecay = overloadDecayBase * (0.85 + fishing.reelTension);
+    fishing.reelTension = Math.max(0, fishing.reelTension - reelDecay * dt);
+  }
 
   const inFightWindow = tensionRatio >= 0.45 && tensionRatio <= 0.86;
   const playerControl = rodForce * 0.9 + reelForce * 1.2 + (inFightWindow && (gPressed || hPressed) ? 1 : 0);
   const fishControl = fishForce + (fishing.fishPattern === 'headshake' ? 0.8 : 0) + (fishing.fishPattern === 'deeppull' ? 0.6 : 0);
-  const distanceDelta = (fishControl - playerControl) * dt * 0.72;
+
+  const fishWeightResistance = Math.max(0.55, Math.min(2.1, activeFish.weight / Math.max(0.8, rigStats.finalLoad) + 0.7));
+  const pullInput = (gPressed ? 1 : 0) + (hPressed ? 1 : 0);
+  const tensionGrip = Math.max(fishing.rodTension, fishing.reelTension);
+  const playerTowardShore = playerControl * (0.85 + pullInput * 0.18) / fishWeightResistance;
+  const fishPushAway = fishControl * (0.65 + fishWeightResistance * 0.35);
+  const controlDelta = (fishPushAway - playerTowardShore) * dt * 0.56;
+  const tensionPullBoost = 0.08 + tensionGrip * 0.24;
+  const steadyPullToShore = pullInput > 0 ? (0.16 + (2.2 - fishWeightResistance) * 0.065 + tensionPullBoost) * pullInput * dt : 0;
+  const distanceDelta = controlDelta - steadyPullToShore;
 
   fishing.fishDistance = Math.max(0, Math.min(fishing.fishStartDistance * 1.7, fishing.fishDistance + distanceDelta));
   fishing.fishVelocity = fishing.fishVelocity * 0.74 + Math.abs(distanceDelta) * 0.26;
@@ -897,9 +974,15 @@ function updateFishing(dt: number): void {
     }
   }
 
-  fishing.rodOverload = fishing.rodWear / 100;
-  fishing.reelOverload = fishing.reelWear / 100;
+  fishing.rodOverload = fishing.rodTension;
+  fishing.reelOverload = fishing.reelTension;
   fishing.catchProgress = Math.max(0, Math.min(100, (1 - fishing.fishDistance / Math.max(1, fishing.fishStartDistance)) * 100));
+
+  if (fishing.rodTension >= 1 && gPressed) fishing.rodCriticalHold += dt;
+  else fishing.rodCriticalHold = Math.max(0, fishing.rodCriticalHold - dt * 1.8);
+
+  if (fishing.reelTension >= 1 && hPressed) fishing.reelCriticalHold += dt;
+  else fishing.reelCriticalHold = Math.max(0, fishing.reelCriticalHold - dt * 1.8);
 
   if (gPressed) fishing.lastPull = 'rod';
   else if (hPressed) fishing.lastPull = 'reel';
@@ -913,13 +996,22 @@ function updateFishing(dt: number): void {
     return;
   }
 
+  const criticalBreakDelay = 2.8;
+  if (fishing.rodCriticalHold >= criticalBreakDelay || fishing.reelCriticalHold >= criticalBreakDelay) {
+    if (fishing.rodTension >= fishing.reelTension) breakRigPart('rod');
+    else breakRigPart('reel');
+    setPhase('broken');
+    window.setTimeout(() => setPhase('idle'), 1400);
+    return;
+  }
+
   if (fishing.escapeMeter >= 100 || fishing.fishDistance >= fishing.fishStartDistance * 1.55) {
     setPhase('escaped');
     window.setTimeout(() => setPhase('idle'), 1200);
     return;
   }
 
-  if (fishing.fishDistance <= 0.9) {
+  if (fishing.catchProgress >= 99.5 || fishing.fishDistance <= 1.6) {
     totalFishCaught += 1;
     keepnet.push(activeFish);
     setPhase('landed', activeFish);
@@ -937,6 +1029,7 @@ function renderHudOnly(): void {
   const rodLoadBar = document.querySelector<HTMLDivElement>('#rod-load-bar');
   const reelLoadBar = document.querySelector<HTMLDivElement>('#reel-load-bar');
   const bobber = document.querySelector<HTMLDivElement>('#bobber');
+  const fishMarker = document.querySelector<HTMLDivElement>('#fish-marker');
 
   if (rodLoadBar) rodLoadBar.style.width = `${Math.max(0, Math.min(100, fishing.rodTension * 100)).toFixed(0)}%`;
   if (reelLoadBar) reelLoadBar.style.width = `${Math.max(0, Math.min(100, fishing.reelTension * 100)).toFixed(0)}%`;
@@ -945,6 +1038,17 @@ function renderHudOnly(): void {
     bobber.style.left = `${fishing.floatX}%`;
     bobber.style.top = `${fishing.floatY}%`;
     bobber.style.setProperty('--bobber-cut', `${fishing.bobberCut.toFixed(2)}`);
+  }
+
+  if (fishMarker) {
+    const markerPosition = getFishMarkerPosition();
+    if (!markerPosition) {
+      fishMarker.style.display = 'none';
+    } else {
+      fishMarker.style.display = 'block';
+      fishMarker.style.left = `${markerPosition.x.toFixed(2)}%`;
+      fishMarker.style.top = `${markerPosition.y.toFixed(2)}%`;
+    }
   }
 }
 
@@ -1001,6 +1105,8 @@ window.addEventListener('keydown', (event) => {
     fishing.reelWear = 0;
     fishing.fishPattern = fishing.fish?.preferredFightPattern ?? 'struggle';
     fishing.fishPatternTimer = 0;
+    fishing.rodCriticalHold = 0;
+    fishing.reelCriticalHold = 0;
     setPhase('hooked', fishing.fish ?? undefined);
   }
 });
