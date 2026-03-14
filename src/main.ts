@@ -73,6 +73,8 @@ interface FishingState {
   dragSetting: number;
   fishPattern: FishFightPattern;
   fishPatternTimer: number;
+  rodCriticalHold: number;
+  reelCriticalHold: number;
 }
 
 const appEl = document.querySelector<HTMLDivElement>('#app');
@@ -154,6 +156,8 @@ let fishing: FishingState = {
   dragSetting: 0.55,
   fishPattern: 'struggle',
   fishPatternTimer: 0,
+  rodCriticalHold: 0,
+  reelCriticalHold: 0,
 };
 
 let gPressed = false;
@@ -262,6 +266,8 @@ function resetFightState(): void {
   fishing.dragSetting = 0.55;
   fishing.fishPattern = 'struggle';
   fishing.fishPatternTimer = 0;
+  fishing.rodCriticalHold = 0;
+  fishing.reelCriticalHold = 0;
   fishing.fish = null;
 }
 
@@ -293,6 +299,12 @@ function breakCurrentRig(): void {
   [equipped.rod, equipped.reel, equipped.line].forEach((id) => {
     if (id) removeOneItem(id);
   });
+}
+
+function breakRigPart(part: 'rod' | 'reel' | 'line'): void {
+  const itemId = equipped[part];
+  if (!itemId) return;
+  removeOneItem(itemId);
 }
 
 function buyItem(itemId: string): void {
@@ -392,6 +404,8 @@ function startCasting(x: number, y: number): void {
   fishing.reelWear = 0;
   fishing.fishPattern = 'struggle';
   fishing.fishPatternTimer = 0;
+  fishing.rodCriticalHold = 0;
+  fishing.reelCriticalHold = 0;
 
   setPhase('waiting');
 }
@@ -857,10 +871,31 @@ function updateFishing(dt: number): void {
 
   const rawTensionKg = Math.max(0, fishForce + rodForce + reelForce - dragRelief);
   const tensionRatio = rawTensionKg / Math.max(0.75, rigStats.finalLoad);
+  const fishToRigRatio = Math.max(0.35, activeFish.weight / Math.max(0.6, rigStats.finalLoad));
+  const pressureFactor = Math.max(0.2, fishForce / Math.max(0.5, rigStats.finalLoad));
+  const overloadGainBase = Math.max(0.04, (fishToRigRatio * 0.16 + pressureFactor * 0.12 + Math.max(0, tensionRatio - 0.52) * 0.3));
+  const overloadDecayBase = 0.2 + Math.max(0, 0.35 - fishToRigRatio) * 0.35;
+
+  const rodPressure = rawTensionKg / Math.max(0.55, rigStats.rodLoad);
+  const reelPressure = rawTensionKg / Math.max(0.55, rigStats.reelLoad);
 
   fishing.currentLoad = rawTensionKg;
-  fishing.rodTension = gPressed ? Math.max(0.05, Math.min(1, rawTensionKg / Math.max(0.55, rigStats.rodLoad))) : 0;
-  fishing.reelTension = hPressed ? Math.max(0.05, Math.min(1, rawTensionKg / Math.max(0.55, rigStats.reelLoad))) : 0;
+
+  if (gPressed) {
+    const rodGain = overloadGainBase * (0.55 + Math.min(1.8, rodPressure));
+    fishing.rodTension = Math.min(1, fishing.rodTension + rodGain * dt);
+  } else {
+    const rodDecay = overloadDecayBase * (0.85 + fishing.rodTension);
+    fishing.rodTension = Math.max(0, fishing.rodTension - rodDecay * dt);
+  }
+
+  if (hPressed) {
+    const reelGain = overloadGainBase * (0.55 + Math.min(1.8, reelPressure));
+    fishing.reelTension = Math.min(1, fishing.reelTension + reelGain * dt);
+  } else {
+    const reelDecay = overloadDecayBase * (0.85 + fishing.reelTension);
+    fishing.reelTension = Math.max(0, fishing.reelTension - reelDecay * dt);
+  }
 
   const inFightWindow = tensionRatio >= 0.45 && tensionRatio <= 0.86;
   const playerControl = rodForce * 0.9 + reelForce * 1.2 + (inFightWindow && (gPressed || hPressed) ? 1 : 0);
@@ -897,9 +932,15 @@ function updateFishing(dt: number): void {
     }
   }
 
-  fishing.rodOverload = fishing.rodWear / 100;
-  fishing.reelOverload = fishing.reelWear / 100;
+  fishing.rodOverload = fishing.rodTension;
+  fishing.reelOverload = fishing.reelTension;
   fishing.catchProgress = Math.max(0, Math.min(100, (1 - fishing.fishDistance / Math.max(1, fishing.fishStartDistance)) * 100));
+
+  if (fishing.rodTension >= 1 && gPressed) fishing.rodCriticalHold += dt;
+  else fishing.rodCriticalHold = Math.max(0, fishing.rodCriticalHold - dt * 1.8);
+
+  if (fishing.reelTension >= 1 && hPressed) fishing.reelCriticalHold += dt;
+  else fishing.reelCriticalHold = Math.max(0, fishing.reelCriticalHold - dt * 1.8);
 
   if (gPressed) fishing.lastPull = 'rod';
   else if (hPressed) fishing.lastPull = 'reel';
@@ -908,6 +949,15 @@ function updateFishing(dt: number): void {
 
   if (fishing.lineWear >= 100 || fishing.rodWear >= 100 || fishing.reelWear >= 100) {
     breakCurrentRig();
+    setPhase('broken');
+    window.setTimeout(() => setPhase('idle'), 1400);
+    return;
+  }
+
+  const criticalBreakDelay = 2.8;
+  if (fishing.rodCriticalHold >= criticalBreakDelay || fishing.reelCriticalHold >= criticalBreakDelay) {
+    if (fishing.rodTension >= fishing.reelTension) breakRigPart('rod');
+    else breakRigPart('reel');
     setPhase('broken');
     window.setTimeout(() => setPhase('idle'), 1400);
     return;
@@ -1001,6 +1051,8 @@ window.addEventListener('keydown', (event) => {
     fishing.reelWear = 0;
     fishing.fishPattern = fishing.fish?.preferredFightPattern ?? 'struggle';
     fishing.fishPatternTimer = 0;
+    fishing.rodCriticalHold = 0;
+    fishing.reelCriticalHold = 0;
     setPhase('hooked', fishing.fish ?? undefined);
   }
 });
