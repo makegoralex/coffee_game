@@ -745,14 +745,16 @@ function updateFloatPosition(): void {
 
   const maxDistance = Math.max(1, fishing.fishStartDistance);
   const distanceRatio = Math.max(0, Math.min(1, fishing.fishDistance / maxDistance));
+  const tensionGrip = Math.max(fishing.rodTension, fishing.reelTension);
+  const lateralSuppression = 1 - tensionGrip * 0.72;
   const towardShore = (1 - distanceRatio) * 18;
   const wave = Math.sin(fishing.fightTimer * 2.2) * (1.1 + fishing.fishVelocity * 0.35);
   const patternDrift =
     fishing.fishPattern === 'run'
-      ? Math.sin(fishing.fightTimer * 4.4) * 4.8
+      ? Math.sin(fishing.fightTimer * 4.4) * 4.8 * lateralSuppression
       : fishing.fishPattern === 'headshake'
-        ? Math.sin(fishing.fightTimer * 9.8) * 2.7
-        : Math.sin(fishing.fightTimer * 1.6) * 1.2;
+        ? Math.sin(fishing.fightTimer * 9.8) * 2.7 * lateralSuppression
+        : Math.sin(fishing.fightTimer * 1.6) * 1.2 * lateralSuppression;
 
   fishing.floatX = Math.max(8, Math.min(92, activeRod.castX + patternDrift));
   fishing.floatY = Math.max(16, Math.min(82, activeRod.castY + distanceRatio * 3.2 - towardShore * 0.25 + wave));
@@ -765,13 +767,15 @@ function getFishMarkerPosition(): { x: number; y: number } | null {
 
   const maxDistance = Math.max(1, fishing.fishStartDistance);
   const distanceRatio = Math.max(0, Math.min(1, fishing.fishDistance / maxDistance));
+  const tensionGrip = Math.max(fishing.rodTension, fishing.reelTension);
+  const lateralSuppression = 1 - tensionGrip * 0.78;
   const progressToShore = 1 - distanceRatio;
   const lateralDrift =
     fishing.fishPattern === 'run'
-      ? Math.sin(fishing.fightTimer * 4.4) * 4.2
+      ? Math.sin(fishing.fightTimer * 4.4) * 4.2 * lateralSuppression
       : fishing.fishPattern === 'headshake'
-        ? Math.sin(fishing.fightTimer * 8.6) * 2.4
-        : Math.sin(fishing.fightTimer * 1.8) * 1.4;
+        ? Math.sin(fishing.fightTimer * 8.6) * 2.4 * lateralSuppression
+        : Math.sin(fishing.fightTimer * 1.8) * 1.4 * lateralSuppression;
   const wave = Math.sin(fishing.fightTimer * 2.4) * (0.3 + fishing.fishVelocity * 0.2);
 
   const x = Math.max(6, Math.min(94, activeRod.castX + lateralDrift));
@@ -932,10 +936,12 @@ function updateFishing(dt: number): void {
 
   const fishWeightResistance = Math.max(0.55, Math.min(2.1, activeFish.weight / Math.max(0.8, rigStats.finalLoad) + 0.7));
   const pullInput = (gPressed ? 1 : 0) + (hPressed ? 1 : 0);
+  const tensionGrip = Math.max(fishing.rodTension, fishing.reelTension);
   const playerTowardShore = playerControl * (0.85 + pullInput * 0.18) / fishWeightResistance;
   const fishPushAway = fishControl * (0.65 + fishWeightResistance * 0.35);
-  const controlDelta = (fishPushAway - playerTowardShore) * dt * 0.62;
-  const steadyPullToShore = pullInput > 0 ? (0.06 + (2.2 - fishWeightResistance) * 0.035) * pullInput * dt : 0;
+  const controlDelta = (fishPushAway - playerTowardShore) * dt * 0.56;
+  const tensionPullBoost = 0.08 + tensionGrip * 0.24;
+  const steadyPullToShore = pullInput > 0 ? (0.16 + (2.2 - fishWeightResistance) * 0.065 + tensionPullBoost) * pullInput * dt : 0;
   const distanceDelta = controlDelta - steadyPullToShore;
 
   fishing.fishDistance = Math.max(0, Math.min(fishing.fishStartDistance * 1.7, fishing.fishDistance + distanceDelta));
