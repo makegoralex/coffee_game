@@ -439,6 +439,18 @@ body {
   clip-path: none;
 }
 
+.fish-marker {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffffff;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 10px rgba(255, 255, 255, 0.9);
+}
+
 .line {
   width: 2px;
   height: 255px;
