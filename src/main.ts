@@ -41,6 +41,16 @@ interface CaughtFish {
   fatigueRate: number;
   recoveryRate: number;
   preferredFightPattern: FishFightPattern;
+  experience: number;
+}
+
+interface ConsumableShopItem {
+  id: string;
+  name: string;
+  price: number;
+  foodGain: number;
+  alcoholGain: number;
+  description: string;
 }
 
 interface FishingState {
@@ -95,12 +105,23 @@ const CATALOG: ReadonlyArray<Omit<TackleItem, 'quantity'>> = [
   { id: 'bait_worm', type: 'bait', name: 'Наживка: червь', loadKg: 7, price: 90 },
   { id: 'bait_maggot', type: 'bait', name: 'Наживка: опарыш', loadKg: 9, price: 130 },
 ];
+const CONSUMABLES: ReadonlyArray<ConsumableShopItem> = [
+  { id: 'food_ration', name: 'Пайка рыбака', price: 120, foodGain: 0.28, alcoholGain: 0, description: '+еда' },
+  { id: 'food_hotmeal', name: 'Горячая еда', price: 240, foodGain: 0.52, alcoholGain: 0, description: 'сытно и надолго' },
+  { id: 'alc_beer', name: 'Пиво', price: 150, foodGain: -0.04, alcoholGain: 0.2, description: '+опыт, хуже контроль' },
+  { id: 'alc_vodka', name: 'Водка', price: 290, foodGain: -0.1, alcoholGain: 0.42, description: 'много опыта, сложнее вываживать' },
+];
+
 
 let screen: Screen = 'base';
 let rods: Rod[] = [];
 let rodId = 0;
 let money = 1200;
 let totalFishCaught = 0;
+let playerLevel = 1;
+let playerXp = 0;
+let playerFood = 0.78;
+let playerAlcohol = 0;
 
 const WEEK_DAYS = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'] as const;
 let gameClockMinutes = 2 * 24 * 60 + 22 * 60 + 50;
@@ -185,13 +206,42 @@ function formatGameTime(totalMinutes: number): string {
   return `${hours}:${minutes} ${WEEK_DAYS[dayIndex]}`;
 }
 
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function xpToNextLevel(level: number): number {
+  return Math.round(65 + level * level * 28 + level * 34);
+}
+
+function addPlayerXp(amount: number): void {
+  playerXp += Math.max(0, Math.floor(amount));
+  while (playerXp >= xpToNextLevel(playerLevel)) {
+    playerXp -= xpToNextLevel(playerLevel);
+    playerLevel += 1;
+  }
+}
+
+function applyHourlyNeedsDecay(): void {
+  playerFood = clamp01(playerFood - (0.035 + playerAlcohol * 0.015));
+  playerAlcohol = clamp01(playerAlcohol - 0.03);
+}
+
+function canStartFishing(): boolean {
+  return playerFood > 0.03;
+}
+
 function updateGameClock(dt: number): void {
   gameClockAccumulator += dt;
   const stepSeconds = 10;
+  let changed = false;
   while (gameClockAccumulator >= stepSeconds) {
     gameClockAccumulator -= stepSeconds;
     gameClockMinutes += 10;
+    changed = true;
+    if (gameClockMinutes % 60 === 0) applyHourlyNeedsDecay();
   }
+  if (changed && fishing.phase !== 'hooked' && fishing.phase !== 'bite') render();
 }
 
 function getInventoryByType(type: ItemType): TackleItem[] {
@@ -318,6 +368,16 @@ function buyItem(itemId: string): void {
   render();
 }
 
+function buyConsumable(itemId: string): void {
+  const item = CONSUMABLES.find((entry) => entry.id === itemId);
+  if (!item || money < item.price) return;
+
+  money -= item.price;
+  playerFood = clamp01(playerFood + item.foodGain);
+  playerAlcohol = clamp01(playerAlcohol + item.alcoholGain);
+  render();
+}
+
 function equipItem(itemId: string): void {
   const item = inventory.find((entry) => entry.id === itemId && entry.quantity > 0);
   if (!item) return;
@@ -348,6 +408,7 @@ function createCaughtFish(species: FishSpecies, locationName: string): CaughtFis
     fatigueRate: 0.85 + species.pullFactor * 0.32,
     recoveryRate: 0.55 + normalizedWeight * 0.06,
     preferredFightPattern: species.pullFactor > 1.45 ? 'deeppull' : species.pullFactor > 1.15 ? 'run' : 'struggle',
+    experience: Math.round((10 + weight * 5.5) * (1 + Math.max(0, 36 - species.chance) / 30) * (isTrophy ? 1.7 : 1)),
   };
 }
 
@@ -368,6 +429,7 @@ function rollFishForLocation(location: LocationData): CaughtFish {
 }
 
 function startCasting(x: number, y: number): void {
+  if (!canStartFishing()) return;
   if (!isRodReady()) return;
   const bait = getInventoryItem(equipped.bait);
   if (!bait) return;
@@ -438,7 +500,7 @@ function phaseText(phase: FishingPhase): string {
   if (phase === 'idle') return 'Ожидание';
   if (phase === 'waiting') return 'Поплавок в воде';
   if (phase === 'bite') return 'Клёв! Жми SPACE';
-  if (phase === 'hooked') return 'Борьба: держи натяг в зоне, G/H + Q/E';
+  if (phase === 'hooked') return 'Борьба: вываживай G/H и тяни к берегу';
   if (phase === 'landed') return 'Рыба в садке';
   if (phase === 'escaped') return 'Сошла';
   return 'Снасть сломана';
@@ -487,6 +549,10 @@ function renderShopPanelCategorized(): string {
             `;
           })
           .join('')}
+        <div class="shop-category">
+          <div class="shop-category-title">Еда и алкоголь</div>
+          ${CONSUMABLES.map((item) => `<button class="shop-btn" data-buy-consumable-id="${item.id}" ${money < item.price ? 'disabled' : ''}>${item.name} • ${item.description} • ${formatMoney(item.price)}</button>`).join('')}
+        </div>
       </div>
     </div>
   `;
@@ -519,8 +585,8 @@ function render(): void {
     <div class="viewport-fit">
       <div class="game-root wood-bg">
         <header class="top-bar">
-          <div class="money-box">Время: <b>${formatGameTime(gameClockMinutes)}</b> &nbsp;&nbsp; Деньги: <b>${formatMoney(money)}</b></div>
-          <div class="menu-box">SPACE — подсечка | G/H — вываживание</div>
+          <div class="money-box">Время: <b>${formatGameTime(gameClockMinutes)}</b> &nbsp;&nbsp; Деньги: <b>${formatMoney(money)}</b> &nbsp;&nbsp; Разряд: <b>${playerLevel}</b></div>
+          <div class="menu-box">SPACE — подсечка | G/H — вываживание | Пьянее = сложнее</div>
         </header>
 
         <div class="main-layout">
@@ -543,8 +609,10 @@ function render(): void {
               <h3>Баланс: ${formatMoney(money)}</h3>
               <p>Локация: ${location.name}</p>
               <small>Рыбы поймано: ${totalFishCaught}</small>
+              <small>Опыт: ${playerXp} / ${xpToNextLevel(playerLevel)}</small>
               <small>Садок: ${keepnet.length} шт, ${formatMoney(keepnetTotal)}</small>
               <small>Удилище: ${rigStats ? `${rigStats.rodLoad.toFixed(1)} кг` : '—'} | Катушка: ${rigStats ? `${rigStats.reelLoad.toFixed(1)} кг` : '—'}</small>
+              <small>${canStartFishing() ? 'Состояние: можно ловить' : 'Состояние: голоден, нужно поесть'}</small>
               <button class="sell-btn" id="sell-keepnet-btn" ${keepnet.length === 0 ? 'disabled' : ''}>Продать садок</button>
             </div>
           </aside>
@@ -552,8 +620,8 @@ function render(): void {
 
         <div class="bottom-panel">
           <div class="status-bars">
-            <div class="status-item"><span>еда</span><div class="bar"><i style="height: 28%"></i></div></div>
-            <div class="status-item"><span>алк</span><div class="bar"><i style="height: 18%"></i></div></div>
+            <div class="status-item"><span>еда</span><div class="bar"><i style="height: ${Math.round(playerFood * 100)}%"></i></div></div>
+            <div class="status-item"><span>алк</span><div class="bar"><i style="height: ${Math.round(playerAlcohol * 100)}%"></i></div></div>
           </div>
 
           <div class="inventory">${renderAssemblyPanel(rigStats)}</div>
@@ -726,6 +794,11 @@ function bindEvents(): void {
     if (itemId) button.addEventListener('click', () => buyItem(itemId));
   });
 
+  document.querySelectorAll<HTMLButtonElement>('[data-buy-consumable-id]').forEach((button) => {
+    const itemId = button.dataset.buyConsumableId;
+    if (itemId) button.addEventListener('click', () => buyConsumable(itemId));
+  });
+
   document.querySelector<HTMLDivElement>('#water')?.addEventListener('click', (event) => {
     if (fishing.phase !== 'idle') return;
     const water = event.currentTarget as HTMLDivElement;
@@ -894,11 +967,12 @@ function updateFishing(dt: number): void {
   const staminaRatio = Math.max(0.05, fishing.fishStamina / Math.max(1, fishing.fishStaminaMax));
   const patternForce = getPatternForceMultiplier(fishing.fishPattern, activeFish);
   const burst = fishing.fishPattern === 'run' ? Math.abs(Math.sin(fishing.fightTimer * 6.2)) * activeFish.runPower : 0;
-  const fishForce = activeFish.strength * patternForce * (0.62 + staminaRatio * 0.78) + burst;
+  const drunkenPenalty = 1 + playerAlcohol * 0.34;
+  const fishForce = (activeFish.strength * patternForce * (0.62 + staminaRatio * 0.78) + burst) * (1 + playerAlcohol * 0.18);
 
-  const rodForce = gPressed ? 1.1 + rigStats.rodLoad * 0.3 : 0;
+  const rodForce = gPressed ? (1.1 + rigStats.rodLoad * 0.3) * (1 - playerAlcohol * 0.22) : 0;
   const reelEfficiency = gPressed ? 1 : 0.48;
-  const reelForce = hPressed ? (0.92 + rigStats.reelLoad * 0.24) * reelEfficiency : 0;
+  const reelForce = hPressed ? (0.92 + rigStats.reelLoad * 0.24) * reelEfficiency * (1 - playerAlcohol * 0.26) : 0;
 
   const rawTensionKg = Math.max(0, fishForce + rodForce + reelForce);
   const tensionRatio = rawTensionKg / Math.max(0.75, rigStats.finalLoad);
@@ -938,7 +1012,7 @@ function updateFishing(dt: number): void {
   const tensionGrip = Math.max(fishing.rodTension, fishing.reelTension);
   const playerTowardShore = playerControl * (0.85 + pullInput * 0.18) / fishWeightResistance;
   const fishPushAway = fishControl * (0.65 + fishWeightResistance * 0.35);
-  const controlDelta = (fishPushAway - playerTowardShore) * dt * 0.56;
+  const controlDelta = (fishPushAway - playerTowardShore) * dt * 0.56 * drunkenPenalty;
   const tensionPullBoost = 0.08 + tensionGrip * 0.24;
   const steadyPullToShore = pullInput > 0 ? (0.22 + (2.2 - fishWeightResistance) * 0.09 + tensionPullBoost) * pullInput * dt : 0;
   const coordinatedPullBonus =
@@ -1019,6 +1093,8 @@ function updateFishing(dt: number): void {
 
   if (fishing.catchProgress >= 99.5 || fishing.fishDistance <= 1.6) {
     totalFishCaught += 1;
+    const xpGain = Math.round(activeFish.experience * (1 + playerAlcohol * 0.55));
+    addPlayerXp(xpGain);
     keepnet.push(activeFish);
     setPhase('landed', activeFish);
     window.setTimeout(() => setPhase('idle'), 1400);
