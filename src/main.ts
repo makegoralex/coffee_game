@@ -6,7 +6,7 @@ type Screen = 'base' | 'map' | 'fishing';
 type ItemType = 'rod' | 'reel' | 'line' | 'hook' | 'bait';
 type FishingPhase = 'idle' | 'waiting' | 'bite' | 'hooked' | 'landed' | 'escaped' | 'broken';
 type PullAction = 'rod' | 'reel' | null;
-type UtilityPanel = 'shop' | 'keepnet';
+type UtilityPanel = 'shop' | 'keepnet' | null;
 type BiteType = 'sink' | 'run';
 type FishFightPattern = 'struggle' | 'run' | 'rest' | 'headshake' | 'deeppull';
 
@@ -14,6 +14,15 @@ interface Rod {
   id: number;
   castX: number;
   castY: number;
+  rodSlot: number;
+}
+
+interface RodLoadout {
+  rod: string | null;
+  reel: string | null;
+  line: string | null;
+  hook: string | null;
+  bait: string | null;
 }
 
 interface TackleItem {
@@ -41,6 +50,16 @@ interface CaughtFish {
   fatigueRate: number;
   recoveryRate: number;
   preferredFightPattern: FishFightPattern;
+  experience: number;
+}
+
+interface ConsumableShopItem {
+  id: string;
+  name: string;
+  price: number;
+  foodGain: number;
+  alcoholGain: number;
+  description: string;
 }
 
 interface FishingState {
@@ -70,7 +89,6 @@ interface FishingState {
   lineWear: number;
   rodWear: number;
   reelWear: number;
-  dragSetting: number;
   fishPattern: FishFightPattern;
   fishPatternTimer: number;
   rodCriticalHold: number;
@@ -96,19 +114,30 @@ const CATALOG: ReadonlyArray<Omit<TackleItem, 'quantity'>> = [
   { id: 'bait_worm', type: 'bait', name: 'Наживка: червь', loadKg: 7, price: 90 },
   { id: 'bait_maggot', type: 'bait', name: 'Наживка: опарыш', loadKg: 9, price: 130 },
 ];
+const CONSUMABLES: ReadonlyArray<ConsumableShopItem> = [
+  { id: 'food_ration', name: 'Пайка рыбака', price: 120, foodGain: 0.28, alcoholGain: 0, description: '+еда' },
+  { id: 'food_hotmeal', name: 'Горячая еда', price: 240, foodGain: 0.52, alcoholGain: 0, description: 'сытно и надолго' },
+  { id: 'alc_beer', name: 'Пиво', price: 150, foodGain: -0.04, alcoholGain: 0.2, description: '+опыт, хуже контроль' },
+  { id: 'alc_vodka', name: 'Водка', price: 290, foodGain: -0.1, alcoholGain: 0.42, description: 'много опыта, сложнее вываживать' },
+];
+
 
 let screen: Screen = 'base';
 let rods: Rod[] = [];
 let rodId = 0;
 let money = 1200;
 let totalFishCaught = 0;
+let playerLevel = 1;
+let playerXp = 0;
+let playerFood = 0.78;
+let playerAlcohol = 0;
 
 const WEEK_DAYS = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'] as const;
 let gameClockMinutes = 2 * 24 * 60 + 22 * 60 + 50;
 let gameClockAccumulator = 0;
 let currentLocationId = 'gold_lake';
 let keepnet: CaughtFish[] = [];
-let activeUtilityPanel: UtilityPanel = 'shop';
+let activeUtilityPanel: UtilityPanel = null;
 
 let inventory: TackleItem[] = [
   { id: 'rod_basic', type: 'rod', name: 'Удилище Basic', loadKg: 6, price: 0, quantity: 1 },
@@ -118,13 +147,12 @@ let inventory: TackleItem[] = [
   { id: 'bait_worm', type: 'bait', name: 'Наживка: червь', loadKg: 7, price: 90, quantity: 6 },
 ];
 
-let equipped: Record<ItemType, string | null> = {
-  rod: 'rod_basic',
-  reel: 'reel_basic',
-  line: 'line_basic',
-  hook: 'hook_basic',
-  bait: 'bait_worm',
-};
+let rodLoadouts: RodLoadout[] = [
+  { rod: 'rod_basic', reel: 'reel_basic', line: 'line_basic', hook: 'hook_basic', bait: 'bait_worm' },
+  { rod: null, reel: null, line: null, hook: null, bait: null },
+  { rod: null, reel: null, line: null, hook: null, bait: null },
+];
+let activeRodSlot = 0;
 
 let fishing: FishingState = {
   phase: 'idle',
@@ -153,7 +181,6 @@ let fishing: FishingState = {
   lineWear: 0,
   rodWear: 0,
   reelWear: 0,
-  dragSetting: 0.55,
   fishPattern: 'struggle',
   fishPatternTimer: 0,
   rodCriticalHold: 0,
@@ -168,11 +195,7 @@ let debugVisible = false;
 let audioContext: AudioContext | null = null;
 
 function applyViewportScale(): void {
-  const viewportFit = document.querySelector<HTMLDivElement>('.viewport-fit');
-  if (!viewportFit) return;
-  const horizontalScale = (window.innerWidth - 24) / BASE_UI_WIDTH;
-  const verticalScale = (window.innerHeight - 24) / BASE_UI_HEIGHT;
-  viewportFit.style.setProperty('--ui-scale', `${Math.max(Math.min(horizontalScale, verticalScale, 1), 0.35)}`);
+  // full-width layout, no additional scaling required
 }
 
 function formatMoney(value: number): string {
@@ -187,13 +210,42 @@ function formatGameTime(totalMinutes: number): string {
   return `${hours}:${minutes} ${WEEK_DAYS[dayIndex]}`;
 }
 
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function xpToNextLevel(level: number): number {
+  return Math.round(65 + level * level * 28 + level * 34);
+}
+
+function addPlayerXp(amount: number): void {
+  playerXp += Math.max(0, Math.floor(amount));
+  while (playerXp >= xpToNextLevel(playerLevel)) {
+    playerXp -= xpToNextLevel(playerLevel);
+    playerLevel += 1;
+  }
+}
+
+function applyHourlyNeedsDecay(): void {
+  playerFood = clamp01(playerFood - (0.035 + playerAlcohol * 0.015));
+  playerAlcohol = clamp01(playerAlcohol - 0.03);
+}
+
+function canStartFishing(): boolean {
+  return playerFood > 0.03;
+}
+
 function updateGameClock(dt: number): void {
   gameClockAccumulator += dt;
   const stepSeconds = 10;
+  let changed = false;
   while (gameClockAccumulator >= stepSeconds) {
     gameClockAccumulator -= stepSeconds;
     gameClockMinutes += 10;
+    changed = true;
+    if (gameClockMinutes % 60 === 0) applyHourlyNeedsDecay();
   }
+  if (changed && fishing.phase !== 'hooked' && fishing.phase !== 'bite') render();
 }
 
 function getInventoryByType(type: ItemType): TackleItem[] {
@@ -220,11 +272,16 @@ function sellKeepnet(): void {
   render();
 }
 
-function getRigStats(): { rodLoad: number; reelLoad: number; finalLoad: number } | null {
-  const rod = getInventoryItem(equipped.rod);
-  const reel = getInventoryItem(equipped.reel);
-  const line = getInventoryItem(equipped.line);
-  const hook = getInventoryItem(equipped.hook);
+
+function getActiveLoadout(): RodLoadout {
+  return rodLoadouts[activeRodSlot];
+}
+
+function getRigStats(loadout: RodLoadout = getActiveLoadout()): { rodLoad: number; reelLoad: number; finalLoad: number } | null {
+  const rod = getInventoryItem(loadout.rod);
+  const reel = getInventoryItem(loadout.reel);
+  const line = getInventoryItem(loadout.line);
+  const hook = getInventoryItem(loadout.hook);
   if (!rod || !reel || !line || !hook) return null;
 
   return {
@@ -234,8 +291,17 @@ function getRigStats(): { rodLoad: number; reelLoad: number; finalLoad: number }
   };
 }
 
+function getRigStatsForSlot(slot: number): { rodLoad: number; reelLoad: number; finalLoad: number } | null {
+  return getRigStats(rodLoadouts[slot]);
+}
+
+function getCastRod(): Rod | null {
+  return rods[0] ?? null;
+}
+
 function isRodReady(): boolean {
-  return Boolean(getRigStats() && getInventoryItem(equipped.bait));
+  const loadout = getActiveLoadout();
+  return Boolean(getRigStats(loadout) && getInventoryItem(loadout.bait));
 }
 
 function resetFightState(): void {
@@ -263,7 +329,6 @@ function resetFightState(): void {
   fishing.lineWear = 0;
   fishing.rodWear = 0;
   fishing.reelWear = 0;
-  fishing.dragSetting = 0.55;
   fishing.fishPattern = 'struggle';
   fishing.fishPatternTimer = 0;
   fishing.rodCriticalHold = 0;
@@ -289,20 +354,23 @@ function removeOneItem(itemId: string): void {
   found.quantity -= 1;
 
   if (found.quantity <= 0) {
-    (Object.keys(equipped) as ItemType[]).forEach((type) => {
-      if (equipped[type] === itemId) equipped[type] = null;
+    rodLoadouts.forEach((loadout) => {
+      (Object.keys(loadout) as ItemType[]).forEach((type) => {
+        if (loadout[type] === itemId) loadout[type] = null;
+      });
     });
   }
 }
 
 function breakCurrentRig(): void {
-  [equipped.rod, equipped.reel, equipped.line].forEach((id) => {
+  const loadout = getActiveLoadout();
+  [loadout.rod, loadout.reel, loadout.line].forEach((id) => {
     if (id) removeOneItem(id);
   });
 }
 
 function breakRigPart(part: 'rod' | 'reel' | 'line'): void {
-  const itemId = equipped[part];
+  const itemId = getActiveLoadout()[part];
   if (!itemId) return;
   removeOneItem(itemId);
 }
@@ -317,14 +385,25 @@ function buyItem(itemId: string): void {
   if (existing) existing.quantity += 1;
   else inventory.push({ ...catalogItem, quantity: 1 });
 
-  if (!equipped[catalogItem.type]) equipped[catalogItem.type] = catalogItem.id;
+  const loadout = getActiveLoadout();
+  if (!loadout[catalogItem.type]) loadout[catalogItem.type] = catalogItem.id;
   render();
 }
 
-function equipItem(itemId: string): void {
+function applyConsumablePurchase(itemId: string): void {
+  const item = CONSUMABLES.find((entry) => entry.id === itemId);
+  if (!item || money < item.price) return;
+
+  money -= item.price;
+  playerFood = clamp01(playerFood + item.foodGain);
+  playerAlcohol = clamp01(playerAlcohol + item.alcoholGain);
+  render();
+}
+
+function applyEquipItem(itemId: string): void {
   const item = inventory.find((entry) => entry.id === itemId && entry.quantity > 0);
   if (!item) return;
-  equipped[item.type] = item.id;
+  getActiveLoadout()[item.type] = item.id;
   render();
 }
 
@@ -351,6 +430,7 @@ function createCaughtFish(species: FishSpecies, locationName: string): CaughtFis
     fatigueRate: 0.85 + species.pullFactor * 0.32,
     recoveryRate: 0.55 + normalizedWeight * 0.06,
     preferredFightPattern: species.pullFactor > 1.45 ? 'deeppull' : species.pullFactor > 1.15 ? 'run' : 'struggle',
+    experience: Math.round((10 + weight * 5.5) * (1 + Math.max(0, 36 - species.chance) / 30) * (isTrophy ? 1.7 : 1)),
   };
 }
 
@@ -371,14 +451,15 @@ function rollFishForLocation(location: LocationData): CaughtFish {
 }
 
 function startCasting(x: number, y: number): void {
+  if (!canStartFishing()) return;
   if (!isRodReady()) return;
-  const bait = getInventoryItem(equipped.bait);
+  const bait = getInventoryItem(getActiveLoadout().bait);
   if (!bait) return;
 
   removeOneItem(bait.id);
 
   rodId += 1;
-  rods = [{ id: rodId, castX: x, castY: y }];
+  rods = [{ id: rodId, castX: x, castY: y, rodSlot: activeRodSlot }];
   fishing.floatX = x;
   fishing.floatY = y;
   fishing.bobberCut = 0;
@@ -441,7 +522,7 @@ function phaseText(phase: FishingPhase): string {
   if (phase === 'idle') return 'Ожидание';
   if (phase === 'waiting') return 'Поплавок в воде';
   if (phase === 'bite') return 'Клёв! Жми SPACE';
-  if (phase === 'hooked') return 'Борьба: держи натяг в зоне, G/H + Q/E';
+  if (phase === 'hooked') return 'Борьба: вываживай G/H и тяни к берегу';
   if (phase === 'landed') return 'Рыба в садке';
   if (phase === 'escaped') return 'Сошла';
   return 'Снасть сломана';
@@ -490,6 +571,10 @@ function renderShopPanelCategorized(): string {
             `;
           })
           .join('')}
+        <div class="shop-category">
+          <div class="shop-category-title">Еда и алкоголь</div>
+          ${CONSUMABLES.map((item) => `<button class="shop-btn" data-buy-consumable-id="${item.id}" ${money < item.price ? 'disabled' : ''}>${item.name} • ${item.description} • ${formatMoney(item.price)}</button>`).join('')}
+        </div>
       </div>
     </div>
   `;
@@ -522,8 +607,8 @@ function render(): void {
     <div class="viewport-fit">
       <div class="game-root wood-bg">
         <header class="top-bar">
-          <div class="money-box">Время: <b>${formatGameTime(gameClockMinutes)}</b> &nbsp;&nbsp; Деньги: <b>${formatMoney(money)}</b></div>
-          <div class="menu-box">SPACE — подсечка | G/H — вываживание | Q/E — фрикцион</div>
+          <div class="money-box">Время: <b>${formatGameTime(gameClockMinutes)}</b> &nbsp;&nbsp; Деньги: <b>${formatMoney(money)}</b> &nbsp;&nbsp; Разряд: <b>${playerLevel}</b></div>
+          <div class="menu-box">SPACE — подсечка | G/H — вываживание | 1/2/3 — удочка</div>
         </header>
 
         <div class="main-layout">
@@ -533,21 +618,17 @@ function render(): void {
             ${screen === 'fishing' ? renderFishingScreen(rigStats) : ''}
           </div>
 
-          <aside class="right-sidebar">
-            <div class="depth-widget">
-              <div class="depth-line"></div>
-              <div class="depth-value">${fishing.currentLoad.toFixed(2)} кг</div>
-            </div>
-
+          <aside class="right-sidebar compact">
             <button class="mini-map" id="open-map-btn" ${screen === 'map' ? 'disabled' : ''}>Карта</button>
-            <button class="base-btn" id="go-base-btn">На базу</button>
 
             <div class="info-card">
               <h3>Баланс: ${formatMoney(money)}</h3>
               <p>Локация: ${location.name}</p>
               <small>Рыбы поймано: ${totalFishCaught}</small>
+              <small>Опыт: ${playerXp} / ${xpToNextLevel(playerLevel)}</small>
               <small>Садок: ${keepnet.length} шт, ${formatMoney(keepnetTotal)}</small>
               <small>Удилище: ${rigStats ? `${rigStats.rodLoad.toFixed(1)} кг` : '—'} | Катушка: ${rigStats ? `${rigStats.reelLoad.toFixed(1)} кг` : '—'}</small>
+              <small>${canStartFishing() ? 'Состояние: можно ловить' : 'Состояние: голоден, нужно поесть'}</small>
               <button class="sell-btn" id="sell-keepnet-btn" ${keepnet.length === 0 ? 'disabled' : ''}>Продать садок</button>
             </div>
           </aside>
@@ -555,16 +636,21 @@ function render(): void {
 
         <div class="bottom-panel">
           <div class="status-bars">
-            <div class="status-item"><span>еда</span><div class="bar"><i style="height: 28%"></i></div></div>
-            <div class="status-item"><span>алк</span><div class="bar"><i style="height: 18%"></i></div></div>
+            <div class="status-item"><span>еда</span><div class="bar"><i style="height: ${Math.round(playerFood * 100)}%"></i></div></div>
+            <div class="status-item"><span>алк</span><div class="bar"><i style="height: ${Math.round(playerAlcohol * 100)}%"></i></div></div>
           </div>
 
           <div class="inventory">${renderAssemblyPanel(rigStats)}</div>
           <div class="chat-area">
-            ${renderUtilityPanel()}
+            <div class="utility-icons">
+              <button class="utility-btn" id="open-shop-btn" title="Магазин"><span class="utility-emoji">🛒</span><span>магазин</span></button>
+              <button class="utility-btn" id="open-keepnet-btn" title="Садок"><span class="utility-emoji">🧺</span><span>садок</span></button>
+              <button class="utility-btn" id="go-base-btn" title="На базу"><span class="utility-emoji">🏕️</span><span>на базу</span></button>
+            </div>
           </div>
         </div>
       </div>
+      ${activeUtilityPanel ? `<div class="utility-modal"><div class="utility-modal-backdrop" id="close-utility-modal"></div><div class="utility-modal-content"><button class="utility-modal-close" id="close-utility-modal-btn">×</button>${activeUtilityPanel === 'shop' ? renderShopPanelCategorized() : `<div class="keepnet-panel"><div class="panel-title">Садок</div>${renderKeepnetList()}</div>`}</div></div>` : ''}
     </div>
   `;
 
@@ -603,13 +689,14 @@ function renderMapScreen(): string {
 }
 
 function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; finalLoad: number } | null): string {
-  const activeRod = rods[0];
+  const activeRod = getCastRod();
   const location = getCurrentLocation();
   const fishMarker = getFishMarkerPosition();
 
   return `
     <section class="screen fishing-screen" style="${location.sceneImage ? `--lake-image:url('${location.sceneImage}')` : ''}">
       <div class="water-overlay" id="water">
+        <div class="shore-rods">${[0, 1, 2].map((slot) => `<button class="shore-rod ${slot === activeRodSlot ? 'active' : ''}" data-rod-slot="${slot}" title="Удочка ${slot + 1}">${slot + 1}</button>`).join('')}</div>
         ${activeRod ? `<div class="rod" style="left:${activeRod.castX}%;"><div class="line"></div><div class="stick"></div></div>` : ''}
         ${
           activeRod
@@ -623,7 +710,7 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
         }
       </div>
 
-      <div class="tension-widget">
+      <div class="rod-slot-strip">${rodLoadouts.map((_, i) => `<button class="rod-slot-btn ${i === activeRodSlot ? 'active' : ''}" data-rod-slot="${i}">Удочка ${i + 1}</button>`).join('')}</div><div class="tension-widget">
         <div class="tension-meter">
           <div class="tension-title">Удилище</div>
           <div class="tension-track tension-track--rod"><i id="rod-load-bar" style="width:${Math.max(0, Math.min(100, fishing.rodTension * 100)).toFixed(0)}%"></i></div>
@@ -636,7 +723,7 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
 
       ${
         debugVisible
-          ? `<div class="debug-panel">phase: ${phaseText(fishing.phase)}<br/>fish: ${fishing.fish ? `${fishing.fish.name} ${fishing.fish.weight.toFixed(2)}кг` : '—'}<br/>distance: ${fishing.fishDistance.toFixed(1)}м<br/>stamina: ${fishing.fishStamina.toFixed(0)} / ${fishing.fishStaminaMax.toFixed(0)}<br/>pattern: ${fishing.fishPattern}<br/>drag: ${(fishing.dragSetting * 100).toFixed(0)}%<br/>wear L/Rd/Rl: ${fishing.lineWear.toFixed(0)} / ${fishing.rodWear.toFixed(0)} / ${fishing.reelWear.toFixed(0)}</div>`
+          ? `<div class="debug-panel">phase: ${phaseText(fishing.phase)}<br/>fish: ${fishing.fish ? `${fishing.fish.name} ${fishing.fish.weight.toFixed(2)}кг` : '—'}<br/>distance: ${fishing.fishDistance.toFixed(1)}м<br/>stamina: ${fishing.fishStamina.toFixed(0)} / ${fishing.fishStaminaMax.toFixed(0)}<br/>pattern: ${fishing.fishPattern}<br/>wear L/Rd/Rl: ${fishing.lineWear.toFixed(0)} / ${fishing.rodWear.toFixed(0)} / ${fishing.reelWear.toFixed(0)}</div>`
           : ''
       }
     </section>
@@ -644,12 +731,13 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
 }
 
 function renderAssemblyPanel(rigStats: { rodLoad: number; reelLoad: number; finalLoad: number } | null): string {
+  const activeLoadout = getActiveLoadout();
   const groups: ItemType[] = ['rod', 'reel', 'line', 'hook', 'bait'];
   const labels: Record<ItemType, string> = { rod: 'Удилище', reel: 'Катушка', line: 'Леска', hook: 'Крючок', bait: 'Наживка' };
 
   return `
     <div class="assembly-panel">
-      <div class="panel-title">Сборка снасти</div>
+      <div class="panel-title">Сборка снасти • активная удочка ${activeRodSlot + 1}</div>
       <div class="assembly-grid">
         ${groups
           .map((type) => {
@@ -660,7 +748,7 @@ function renderAssemblyPanel(rigStats: { rodLoad: number; reelLoad: number; fina
                 ${
                   options
                     .map(
-                      (item) => `<button class="equip-btn ${equipped[type] === item.id ? 'active' : ''}" data-equip-id="${item.id}">${item.name} (${item.loadKg}кг) x${item.quantity}</button>`
+                      (item) => `<button class="equip-btn ${activeLoadout[type] === item.id ? 'active' : ''}" data-equip-id="${item.id}">${item.name} (${item.loadKg}кг) x${item.quantity}</button>`
                     )
                     .join('') || '<div class="no-items">нет предметов</div>'
                 }
@@ -699,6 +787,16 @@ function bindEvents(): void {
     render();
   });
 
+  document.querySelector<HTMLButtonElement>('#close-utility-modal-btn')?.addEventListener('click', () => {
+    activeUtilityPanel = null;
+    render();
+  });
+
+  document.querySelector<HTMLDivElement>('#close-utility-modal')?.addEventListener('click', () => {
+    activeUtilityPanel = null;
+    render();
+  });
+
   document.querySelector<HTMLButtonElement>('#close-map-btn')?.addEventListener('click', () => {
     screen = 'base';
     render();
@@ -719,14 +817,28 @@ function bindEvents(): void {
     });
   });
 
+
+  document.querySelectorAll<HTMLButtonElement>('[data-rod-slot]').forEach((button) => {
+    const slot = Number(button.dataset.rodSlot ?? '0');
+    button.addEventListener('click', () => {
+      activeRodSlot = Math.max(0, Math.min(2, slot));
+      render();
+    });
+  });
+
   document.querySelectorAll<HTMLButtonElement>('[data-equip-id]').forEach((button) => {
     const itemId = button.dataset.equipId;
-    if (itemId) button.addEventListener('click', () => equipItem(itemId));
+    if (itemId) button.addEventListener('click', () => applyEquipItem(itemId));
   });
 
   document.querySelectorAll<HTMLButtonElement>('[data-buy-id]').forEach((button) => {
     const itemId = button.dataset.buyId;
     if (itemId) button.addEventListener('click', () => buyItem(itemId));
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-buy-consumable-id]').forEach((button) => {
+    const itemId = button.dataset.buyConsumableId;
+    if (itemId) button.addEventListener('click', () => applyConsumablePurchase(itemId));
   });
 
   document.querySelector<HTMLDivElement>('#water')?.addEventListener('click', (event) => {
@@ -740,7 +852,7 @@ function bindEvents(): void {
 }
 
 function updateFloatPosition(): void {
-  const activeRod = rods[0];
+  const activeRod = getCastRod();
   if (!activeRod || fishing.phase !== 'hooked') return;
 
   const maxDistance = Math.max(1, fishing.fishStartDistance);
@@ -762,13 +874,15 @@ function updateFloatPosition(): void {
 }
 
 function getFishMarkerPosition(): { x: number; y: number } | null {
-  const activeRod = rods[0];
+  const activeRod = getCastRod();
   if (!activeRod || fishing.phase !== 'hooked') return null;
 
   const maxDistance = Math.max(1, fishing.fishStartDistance);
   const distanceRatio = Math.max(0, Math.min(1, fishing.fishDistance / maxDistance));
   const tensionGrip = Math.max(fishing.rodTension, fishing.reelTension);
-  const lateralSuppression = 1 - tensionGrip * 0.78;
+  const pullInput = (gPressed ? 1 : 0) + (hPressed ? 1 : 0);
+  const pullSuppression = pullInput > 0 ? 0.35 : 1;
+  const lateralSuppression = (1 - tensionGrip * 0.78) * pullSuppression;
   const progressToShore = 1 - distanceRatio;
   const lateralDrift =
     fishing.fishPattern === 'run'
@@ -787,7 +901,7 @@ function getFishMarkerPosition(): { x: number; y: number } | null {
 }
 
 function updateBiteAnimation(): void {
-  const activeRod = rods[0];
+  const activeRod = getCastRod();
   if (!activeRod || fishing.phase !== 'bite') return;
 
   if (fishing.biteType === 'sink') {
@@ -895,14 +1009,14 @@ function updateFishing(dt: number): void {
   const staminaRatio = Math.max(0.05, fishing.fishStamina / Math.max(1, fishing.fishStaminaMax));
   const patternForce = getPatternForceMultiplier(fishing.fishPattern, activeFish);
   const burst = fishing.fishPattern === 'run' ? Math.abs(Math.sin(fishing.fightTimer * 6.2)) * activeFish.runPower : 0;
-  const fishForce = activeFish.strength * patternForce * (0.62 + staminaRatio * 0.78) + burst;
+  const drunkenPenalty = 1 + playerAlcohol * 0.34;
+  const fishForce = (activeFish.strength * patternForce * (0.62 + staminaRatio * 0.78) + burst) * (1 + playerAlcohol * 0.18);
 
-  const rodForce = gPressed ? (0.95 + rigStats.rodLoad * 0.24) * (0.95 + fishing.dragSetting * 0.2) : 0;
+  const rodForce = gPressed ? (1.1 + rigStats.rodLoad * 0.3) * (1 - playerAlcohol * 0.22) : 0;
   const reelEfficiency = gPressed ? 1 : 0.48;
-  const reelForce = hPressed ? (0.8 + rigStats.reelLoad * 0.2) * reelEfficiency : 0;
-  const dragRelief = (1 - fishing.dragSetting) * (1.8 + rigStats.reelLoad * 0.08);
+  const reelForce = hPressed ? (0.92 + rigStats.reelLoad * 0.24) * reelEfficiency * (1 - playerAlcohol * 0.26) : 0;
 
-  const rawTensionKg = Math.max(0, fishForce + rodForce + reelForce - dragRelief);
+  const rawTensionKg = Math.max(0, fishForce + rodForce + reelForce);
   const tensionRatio = rawTensionKg / Math.max(0.75, rigStats.finalLoad);
   const fishToRigRatio = Math.max(0.35, activeFish.weight / Math.max(0.6, rigStats.finalLoad));
   const pressureFactor = Math.max(0.2, fishForce / Math.max(0.5, rigStats.finalLoad));
@@ -936,13 +1050,21 @@ function updateFishing(dt: number): void {
 
   const fishWeightResistance = Math.max(0.55, Math.min(2.1, activeFish.weight / Math.max(0.8, rigStats.finalLoad) + 0.7));
   const pullInput = (gPressed ? 1 : 0) + (hPressed ? 1 : 0);
+  const bothPulling = gPressed && hPressed;
   const tensionGrip = Math.max(fishing.rodTension, fishing.reelTension);
   const playerTowardShore = playerControl * (0.85 + pullInput * 0.18) / fishWeightResistance;
   const fishPushAway = fishControl * (0.65 + fishWeightResistance * 0.35);
-  const controlDelta = (fishPushAway - playerTowardShore) * dt * 0.56;
+  const controlDelta = (fishPushAway - playerTowardShore) * dt * 0.56 * drunkenPenalty;
   const tensionPullBoost = 0.08 + tensionGrip * 0.24;
-  const steadyPullToShore = pullInput > 0 ? (0.16 + (2.2 - fishWeightResistance) * 0.065 + tensionPullBoost) * pullInput * dt : 0;
-  const distanceDelta = controlDelta - steadyPullToShore;
+  const steadyPullToShore = pullInput > 0 ? (0.22 + (2.2 - fishWeightResistance) * 0.09 + tensionPullBoost) * pullInput * dt : 0;
+  const coordinatedPullBonus =
+    bothPulling && tensionRatio >= 0.25
+      ? (0.28 + (1 - Math.min(1, staminaRatio)) * 0.42 + tensionGrip * 0.32) * dt
+      : 0;
+  const distanceAfterControl = controlDelta - steadyPullToShore - coordinatedPullBonus;
+  const guaranteedPullSpeed = pullInput > 0 ? 2.4 + pullInput * 1.45 + (bothPulling ? 2.35 : 0) + tensionGrip * 1.15 : 0;
+  const guaranteedPullToShore = guaranteedPullSpeed * dt;
+  const distanceDelta = pullInput > 0 ? Math.min(distanceAfterControl, -guaranteedPullToShore) : distanceAfterControl;
 
   fishing.fishDistance = Math.max(0, Math.min(fishing.fishStartDistance * 1.7, fishing.fishDistance + distanceDelta));
   fishing.fishVelocity = fishing.fishVelocity * 0.74 + Math.abs(distanceDelta) * 0.26;
@@ -1013,6 +1135,8 @@ function updateFishing(dt: number): void {
 
   if (fishing.catchProgress >= 99.5 || fishing.fishDistance <= 1.6) {
     totalFishCaught += 1;
+    const xpGain = Math.round(activeFish.experience * (1 + playerAlcohol * 0.55));
+    addPlayerXp(xpGain);
     keepnet.push(activeFish);
     setPhase('landed', activeFish);
     window.setTimeout(() => setPhase('idle'), 1400);
@@ -1023,9 +1147,6 @@ function updateFishing(dt: number): void {
 }
 
 function renderHudOnly(): void {
-  const depthValue = document.querySelector<HTMLDivElement>('.depth-value');
-  if (depthValue) depthValue.textContent = `${fishing.currentLoad.toFixed(2)} кг`;
-
   const rodLoadBar = document.querySelector<HTMLDivElement>('#rod-load-bar');
   const reelLoadBar = document.querySelector<HTMLDivElement>('#reel-load-bar');
   const bobber = document.querySelector<HTMLDivElement>('#bobber');
@@ -1071,17 +1192,9 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'KeyG') gPressed = true;
   if (event.code === 'KeyH') hPressed = true;
 
-  if (event.code === 'KeyQ') {
-    fishing.dragSetting = Math.max(0.2, fishing.dragSetting - 0.05);
-    renderHudOnly();
-    return;
-  }
-
-  if (event.code === 'KeyE') {
-    fishing.dragSetting = Math.min(1, fishing.dragSetting + 0.05);
-    renderHudOnly();
-    return;
-  }
+  if (event.code === 'Digit1') { activeRodSlot = 0; render(); return; }
+  if (event.code === 'Digit2') { activeRodSlot = 1; render(); return; }
+  if (event.code === 'Digit3') { activeRodSlot = 2; render(); return; }
 
   if (event.code === 'KeyM') {
     screen = screen === 'map' ? 'base' : 'map';
