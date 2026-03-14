@@ -70,7 +70,6 @@ interface FishingState {
   lineWear: number;
   rodWear: number;
   reelWear: number;
-  dragSetting: number;
   fishPattern: FishFightPattern;
   fishPatternTimer: number;
   rodCriticalHold: number;
@@ -153,7 +152,6 @@ let fishing: FishingState = {
   lineWear: 0,
   rodWear: 0,
   reelWear: 0,
-  dragSetting: 0.55,
   fishPattern: 'struggle',
   fishPatternTimer: 0,
   rodCriticalHold: 0,
@@ -263,7 +261,6 @@ function resetFightState(): void {
   fishing.lineWear = 0;
   fishing.rodWear = 0;
   fishing.reelWear = 0;
-  fishing.dragSetting = 0.55;
   fishing.fishPattern = 'struggle';
   fishing.fishPatternTimer = 0;
   fishing.rodCriticalHold = 0;
@@ -523,7 +520,7 @@ function render(): void {
       <div class="game-root wood-bg">
         <header class="top-bar">
           <div class="money-box">Время: <b>${formatGameTime(gameClockMinutes)}</b> &nbsp;&nbsp; Деньги: <b>${formatMoney(money)}</b></div>
-          <div class="menu-box">SPACE — подсечка | G/H — вываживание | Q/E — фрикцион</div>
+          <div class="menu-box">SPACE — подсечка | G/H — вываживание</div>
         </header>
 
         <div class="main-layout">
@@ -636,7 +633,7 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
 
       ${
         debugVisible
-          ? `<div class="debug-panel">phase: ${phaseText(fishing.phase)}<br/>fish: ${fishing.fish ? `${fishing.fish.name} ${fishing.fish.weight.toFixed(2)}кг` : '—'}<br/>distance: ${fishing.fishDistance.toFixed(1)}м<br/>stamina: ${fishing.fishStamina.toFixed(0)} / ${fishing.fishStaminaMax.toFixed(0)}<br/>pattern: ${fishing.fishPattern}<br/>drag: ${(fishing.dragSetting * 100).toFixed(0)}%<br/>wear L/Rd/Rl: ${fishing.lineWear.toFixed(0)} / ${fishing.rodWear.toFixed(0)} / ${fishing.reelWear.toFixed(0)}</div>`
+          ? `<div class="debug-panel">phase: ${phaseText(fishing.phase)}<br/>fish: ${fishing.fish ? `${fishing.fish.name} ${fishing.fish.weight.toFixed(2)}кг` : '—'}<br/>distance: ${fishing.fishDistance.toFixed(1)}м<br/>stamina: ${fishing.fishStamina.toFixed(0)} / ${fishing.fishStaminaMax.toFixed(0)}<br/>pattern: ${fishing.fishPattern}<br/>wear L/Rd/Rl: ${fishing.lineWear.toFixed(0)} / ${fishing.rodWear.toFixed(0)} / ${fishing.reelWear.toFixed(0)}</div>`
           : ''
       }
     </section>
@@ -897,12 +894,11 @@ function updateFishing(dt: number): void {
   const burst = fishing.fishPattern === 'run' ? Math.abs(Math.sin(fishing.fightTimer * 6.2)) * activeFish.runPower : 0;
   const fishForce = activeFish.strength * patternForce * (0.62 + staminaRatio * 0.78) + burst;
 
-  const rodForce = gPressed ? (0.95 + rigStats.rodLoad * 0.24) * (0.95 + fishing.dragSetting * 0.2) : 0;
+  const rodForce = gPressed ? 1.1 + rigStats.rodLoad * 0.3 : 0;
   const reelEfficiency = gPressed ? 1 : 0.48;
-  const reelForce = hPressed ? (0.8 + rigStats.reelLoad * 0.2) * reelEfficiency : 0;
-  const dragRelief = (1 - fishing.dragSetting) * (1.8 + rigStats.reelLoad * 0.08);
+  const reelForce = hPressed ? (0.92 + rigStats.reelLoad * 0.24) * reelEfficiency : 0;
 
-  const rawTensionKg = Math.max(0, fishForce + rodForce + reelForce - dragRelief);
+  const rawTensionKg = Math.max(0, fishForce + rodForce + reelForce);
   const tensionRatio = rawTensionKg / Math.max(0.75, rigStats.finalLoad);
   const fishToRigRatio = Math.max(0.35, activeFish.weight / Math.max(0.6, rigStats.finalLoad));
   const pressureFactor = Math.max(0.2, fishForce / Math.max(0.5, rigStats.finalLoad));
@@ -936,13 +932,21 @@ function updateFishing(dt: number): void {
 
   const fishWeightResistance = Math.max(0.55, Math.min(2.1, activeFish.weight / Math.max(0.8, rigStats.finalLoad) + 0.7));
   const pullInput = (gPressed ? 1 : 0) + (hPressed ? 1 : 0);
+  const bothPulling = gPressed && hPressed;
   const tensionGrip = Math.max(fishing.rodTension, fishing.reelTension);
   const playerTowardShore = playerControl * (0.85 + pullInput * 0.18) / fishWeightResistance;
   const fishPushAway = fishControl * (0.65 + fishWeightResistance * 0.35);
   const controlDelta = (fishPushAway - playerTowardShore) * dt * 0.56;
   const tensionPullBoost = 0.08 + tensionGrip * 0.24;
-  const steadyPullToShore = pullInput > 0 ? (0.16 + (2.2 - fishWeightResistance) * 0.065 + tensionPullBoost) * pullInput * dt : 0;
-  const distanceDelta = controlDelta - steadyPullToShore;
+  const steadyPullToShore = pullInput > 0 ? (0.22 + (2.2 - fishWeightResistance) * 0.09 + tensionPullBoost) * pullInput * dt : 0;
+  const coordinatedPullBonus =
+    bothPulling && tensionRatio >= 0.25
+      ? (0.28 + (1 - Math.min(1, staminaRatio)) * 0.42 + tensionGrip * 0.32) * dt
+      : 0;
+  const distanceAfterControl = controlDelta - steadyPullToShore - coordinatedPullBonus;
+  const guaranteedPullToShore =
+    pullInput > 0 ? (0.14 + pullInput * 0.2 + (bothPulling ? 0.34 : 0) + tensionGrip * 0.26) * dt : 0;
+  const distanceDelta = pullInput > 0 ? Math.min(distanceAfterControl, -guaranteedPullToShore) : distanceAfterControl;
 
   fishing.fishDistance = Math.max(0, Math.min(fishing.fishStartDistance * 1.7, fishing.fishDistance + distanceDelta));
   fishing.fishVelocity = fishing.fishVelocity * 0.74 + Math.abs(distanceDelta) * 0.26;
@@ -1070,18 +1074,6 @@ window.addEventListener('keydown', (event) => {
 
   if (event.code === 'KeyG') gPressed = true;
   if (event.code === 'KeyH') hPressed = true;
-
-  if (event.code === 'KeyQ') {
-    fishing.dragSetting = Math.max(0.2, fishing.dragSetting - 0.05);
-    renderHudOnly();
-    return;
-  }
-
-  if (event.code === 'KeyE') {
-    fishing.dragSetting = Math.min(1, fishing.dragSetting + 0.05);
-    renderHudOnly();
-    return;
-  }
 
   if (event.code === 'KeyM') {
     screen = screen === 'map' ? 'base' : 'map';
