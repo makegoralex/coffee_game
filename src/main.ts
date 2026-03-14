@@ -929,7 +929,14 @@ function updateFishing(dt: number): void {
   const inFightWindow = tensionRatio >= 0.45 && tensionRatio <= 0.86;
   const playerControl = rodForce * 0.9 + reelForce * 1.2 + (inFightWindow && (gPressed || hPressed) ? 1 : 0);
   const fishControl = fishForce + (fishing.fishPattern === 'headshake' ? 0.8 : 0) + (fishing.fishPattern === 'deeppull' ? 0.6 : 0);
-  const distanceDelta = (fishControl - playerControl) * dt * 0.72;
+
+  const fishWeightResistance = Math.max(0.55, Math.min(2.1, activeFish.weight / Math.max(0.8, rigStats.finalLoad) + 0.7));
+  const pullInput = (gPressed ? 1 : 0) + (hPressed ? 1 : 0);
+  const playerTowardShore = playerControl * (0.85 + pullInput * 0.18) / fishWeightResistance;
+  const fishPushAway = fishControl * (0.65 + fishWeightResistance * 0.35);
+  const controlDelta = (fishPushAway - playerTowardShore) * dt * 0.62;
+  const steadyPullToShore = pullInput > 0 ? (0.06 + (2.2 - fishWeightResistance) * 0.035) * pullInput * dt : 0;
+  const distanceDelta = controlDelta - steadyPullToShore;
 
   fishing.fishDistance = Math.max(0, Math.min(fishing.fishStartDistance * 1.7, fishing.fishDistance + distanceDelta));
   fishing.fishVelocity = fishing.fishVelocity * 0.74 + Math.abs(distanceDelta) * 0.26;
