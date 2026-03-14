@@ -400,6 +400,16 @@ function buyConsumable(itemId: string): void {
   render();
 }
 
+function buyConsumable(itemId: string): void {
+  const item = CONSUMABLES.find((entry) => entry.id === itemId);
+  if (!item || money < item.price) return;
+
+  money -= item.price;
+  playerFood = clamp01(playerFood + item.foodGain);
+  playerAlcohol = clamp01(playerAlcohol + item.alcoholGain);
+  render();
+}
+
 function equipItem(itemId: string): void {
   const item = inventory.find((entry) => entry.id === itemId && entry.quantity > 0);
   if (!item) return;
