@@ -1,5 +1,5 @@
 :root {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color: #111;
 }
 
@@ -13,7 +13,7 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: radial-gradient(circle at top, #2b190d 0%, #1f1208 70%);
+  background: radial-gradient(circle at top, #11263b 0%, #091723 70%);
 }
 
 #app {
@@ -27,8 +27,7 @@ body {
   width: 100%;
   height: 100%;
   display: grid;
-  place-items: start center;
-  padding-top: 8px;
+  place-items: stretch;
   overflow: hidden;
 }
 
@@ -37,46 +36,43 @@ body {
 }
 
 .game-root {
-  width: 1280px;
-  height: 960px;
-  transform: scale(var(--ui-scale));
-  transform-origin: top center;
-  border: 3px solid #6f2e0b;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  width: 100%;
+  height: 100%;
+  border: 0;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
   display: grid;
-  grid-template-rows: auto 1fr 190px;
+  grid-template-rows: auto 1fr 220px;
 }
 
 .top-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #703515;
-  border-bottom: 2px solid #451b03;
+  background: linear-gradient(180deg, #2a3f57 0%, #1a2d42 100%);
+  border-bottom: 1px solid rgba(255,255,255,0.15);
   color: #fff;
-  min-height: 42px;
+  min-height: 56px;
 }
 
 .money-box,
 .menu-box {
-  background: #f2efdf;
-  color: #191919;
-  margin: 6px;
-  padding: 8px 14px;
-  border: 2px solid #9d5a2d;
-  font-size: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f4f7ff;
+  margin: 8px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  font-size: 16px;
 }
 
 .menu-box {
   margin-left: auto;
-  font-size: 16px;
-  background: #2b2b2b;
-  color: #fff;
+  font-size: 14px;
 }
 
 .main-layout {
   display: grid;
-  grid-template-columns: 1fr 265px;
+  grid-template-columns: 1fr 320px;
   min-height: 0;
 }
 
@@ -110,10 +106,11 @@ body {
 }
 
 .book-title {
-  font-size: 58px;
+  font-size: 42px;
   text-align: center;
-  font-family: 'Brush Script MT', cursive;
-  margin-bottom: 20px;
+  font-weight: 800;
+  margin-bottom: 18px;
+  letter-spacing: 0.3px;
 }
 
 .book-panel ul {
@@ -123,18 +120,22 @@ body {
 }
 
 .book-panel li {
-  font-size: 42px;
+  font-size: 24px;
   margin-bottom: 12px;
-  font-family: 'Brush Script MT', cursive;
+  line-height: 1.35;
 }
 
 .right-sidebar {
-  background: #84421b;
+  background: linear-gradient(180deg, #1b3045 0%, #19293b 100%);
   padding: 10px;
   display: grid;
-  grid-template-rows: 132px 60px 40px 1fr;
+  grid-template-rows: 60px 1fr;
   gap: 10px;
   min-height: 0;
+}
+
+.right-sidebar.compact {
+  grid-template-rows: 60px 1fr;
 }
 
 .depth-widget {
@@ -184,10 +185,11 @@ body {
 }
 
 .info-card {
-  background: linear-gradient(180deg, #e6e4d0 0%, #d8d7bf 100%);
-  border: 2px solid #97603a;
-  padding: 10px;
-  font-size: 18px;
+  background: rgba(242, 246, 255, 0.9);
+  border: 1px solid #8ca3bb;
+  padding: 12px;
+  font-size: 15px;
+  border-radius: 10px;
   overflow: hidden;
 }
 
@@ -392,7 +394,15 @@ body {
   height: 370px;
   transform: translate(-50%, -6%);
   z-index: 3;
-  pointer-events: none;
+  pointer-events: auto;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.rod.rod--active .stick {
+  box-shadow: 0 0 0 2px rgba(131, 190, 255, 0.85);
 }
 
 .float {
@@ -441,8 +451,8 @@ body {
 
 .fish-marker {
   position: absolute;
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: #ffffff;
   transform: translate(-50%, -50%);
@@ -467,11 +477,11 @@ body {
 }
 
 .bottom-panel {
-  height: 190px;
-  border-top: 3px solid #6f2e0b;
-  background: #6f3515;
+  height: 220px;
+  border-top: 1px solid rgba(255,255,255,0.14);
+  background: linear-gradient(180deg, #1b3045 0%, #142637 100%);
   display: grid;
-  grid-template-columns: 140px 1fr 320px;
+  grid-template-columns: 160px 1fr 360px;
 }
 
 .status-bars {
@@ -483,29 +493,31 @@ body {
 
 .status-item span {
   display: block;
-  font-size: 24px;
-  color: #d4d5bb;
+  font-size: 20px;
+  color: #dce7f7;
 }
 
 .bar {
-  width: 26px;
-  height: 86px;
-  background: #e2dfc8;
-  border: 1px solid #8f8f7c;
+  width: 30px;
+  height: 110px;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 8px;
   display: flex;
   align-items: flex-end;
+  overflow: hidden;
 }
 
 .bar i {
   display: block;
   width: 100%;
-  background: #5fae2f;
+  background: linear-gradient(180deg, #7ce36a 0%, #3ea92f 100%);
 }
 
 .inventory,
 .chat-area {
-  border-left: 2px solid #5b270b;
-  background: #d9d8c4;
+  border-left: 1px solid rgba(255,255,255,0.12);
+  background: #dce5ef;
 }
 
 .inventory {
@@ -662,4 +674,103 @@ body {
 .keepnet-item.trophy {
   border-left: 3px solid #d2952a;
   font-weight: 700;
+}
+
+.status-item:nth-child(2) .bar i {
+  background: linear-gradient(180deg, #ff9b84 0%, #d24a35 100%);
+}
+
+.rod-slot-strip {
+  position: absolute;
+  left: 16px;
+  transform: none;
+  top: 16px;
+  z-index: 6;
+  display: flex;
+  gap: 8px;
+}
+
+.rod-slot-btn {
+  border: 1px solid rgba(255,255,255,0.28);
+  background: rgba(8, 16, 24, 0.74);
+  color: #d9e8ff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rod-slot-btn.active {
+  background: linear-gradient(180deg, #5b86b4 0%, #39648f 100%);
+  color: #fff;
+}
+
+.utility-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+}
+
+.utility-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 8, 14, 0.56);
+}
+
+.utility-modal-content {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(860px, 90vw);
+  max-height: 76vh;
+  overflow: auto;
+  background: #e7eef7;
+  border: 1px solid #7f9dbc;
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.3);
+}
+
+.utility-modal-close {
+  position: sticky;
+  float: right;
+  top: 0;
+  border: 1px solid #5f7994;
+  background: #1e3348;
+  color: #fff;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+}
+
+.shore-rods {
+  position: absolute;
+  left: 16px;
+  bottom: 22px;
+  transform: none;
+  display: flex;
+  gap: 10px;
+  z-index: 7;
+}
+
+.shore-rod {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.4);
+  background: rgba(5, 12, 18, 0.78);
+  color: #d2e4ff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.shore-rod.active {
+  background: linear-gradient(180deg, #82b8ea 0%, #4a7fb1 100%);
+  color: #fff;
+}
+
+.shore-rod.casted {
+  box-shadow: 0 0 0 2px rgba(140, 242, 166, 0.8);
 }
