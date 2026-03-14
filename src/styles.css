@@ -747,11 +747,11 @@ body {
 
 .shore-rods {
   position: absolute;
-  left: 50%;
-  bottom: 14px;
-  transform: translateX(-50%);
+  left: 16px;
+  bottom: 22px;
+  transform: none;
   display: flex;
-  gap: 12px;
+  gap: 10px;
   z-index: 7;
 }
 

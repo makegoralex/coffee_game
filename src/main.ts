@@ -125,7 +125,7 @@ const CONSUMABLES: ReadonlyArray<ConsumableShopItem> = [
 let screen: Screen = 'base';
 let rods: Rod[] = [];
 let rodId = 0;
-let money = 1200;
+let money = 10000;
 let totalFishCaught = 0;
 let playerLevel = 1;
 let playerXp = 0;
@@ -186,6 +186,30 @@ let fishing: FishingState = {
   rodCriticalHold: 0,
   reelCriticalHold: 0,
 };
+
+function cloneFishingState(source: FishingState): FishingState {
+  return { ...source, fish: source.fish ? { ...source.fish } : null };
+}
+
+let slotFishingStates: FishingState[] = [];
+
+function initSlotFishingStates(): void {
+  slotFishingStates = [cloneFishingState(fishing), cloneFishingState(fishing), cloneFishingState(fishing)];
+}
+
+function persistActiveFishingState(): void {
+  slotFishingStates[activeRodSlot] = cloneFishingState(fishing);
+}
+
+function switchActiveRodSlot(slot: number): void {
+  const nextSlot = Math.max(0, Math.min(2, slot));
+  if (nextSlot === activeRodSlot) return;
+  persistActiveFishingState();
+  activeRodSlot = nextSlot;
+  fishing = cloneFishingState(slotFishingStates[activeRodSlot]);
+  render();
+}
+
 
 let gPressed = false;
 let hPressed = false;
@@ -269,6 +293,7 @@ function sellKeepnet(): void {
   if (keepnet.length === 0) return;
   money += getKeepnetTotalPrice();
   keepnet = [];
+  persistActiveFishingState();
   render();
 }
 
@@ -349,6 +374,7 @@ function setPhase(phase: FishingPhase, fishData?: CaughtFish): void {
     rods = rods.filter((rod) => rod.rodSlot !== activeRodSlot);
   }
 
+  persistActiveFishingState();
   render();
 }
 
@@ -391,6 +417,7 @@ function buyItem(itemId: string): void {
 
   const loadout = getActiveLoadout();
   if (!loadout[catalogItem.type]) loadout[catalogItem.type] = catalogItem.id;
+  persistActiveFishingState();
   render();
 }
 
@@ -401,6 +428,7 @@ function applyConsumablePurchase(itemId: string): void {
   money -= item.price;
   playerFood = clamp01(playerFood + item.foodGain);
   playerAlcohol = clamp01(playerAlcohol + item.alcoholGain);
+  persistActiveFishingState();
   render();
 }
 
@@ -408,6 +436,7 @@ function applyEquipItem(itemId: string): void {
   const item = inventory.find((entry) => entry.id === itemId && entry.quantity > 0);
   if (!item) return;
   getActiveLoadout()[item.type] = item.id;
+  persistActiveFishingState();
   render();
 }
 
@@ -454,6 +483,36 @@ function rollFishForLocation(location: LocationData): CaughtFish {
   return createCaughtFish(selected, location.name);
 }
 
+function prepareWaitingState(target: FishingState, x: number, y: number): void {
+  target.floatX = x;
+  target.floatY = y;
+  target.bobberCut = 0;
+  target.waitTimer = 2 + Math.random() * 3;
+  target.fish = rollFishForLocation(getCurrentLocation());
+  target.phase = 'waiting';
+  target.catchProgress = 0;
+  target.fightTimer = 0;
+  target.rodOverload = 0;
+  target.reelOverload = 0;
+  target.rodTension = 0;
+  target.reelTension = 0;
+  target.currentLoad = 0;
+  target.lastPull = null;
+  target.fishDistance = 0;
+  target.fishStartDistance = 0;
+  target.fishVelocity = 0;
+  target.fishStamina = 0;
+  target.fishStaminaMax = 0;
+  target.escapeMeter = 0;
+  target.lineWear = 0;
+  target.rodWear = 0;
+  target.reelWear = 0;
+  target.fishPattern = 'struggle';
+  target.fishPatternTimer = 0;
+  target.rodCriticalHold = 0;
+  target.reelCriticalHold = 0;
+}
+
 function startCasting(x: number, y: number): void {
   if (!canStartFishing()) return;
   if (!isRodReady()) return;
@@ -467,38 +526,14 @@ function startCasting(x: number, y: number): void {
   rods.push({ id: rodId, castX: x, castY: y, rodSlot: activeRodSlot });
 
   if (fishing.phase !== 'idle') {
+    const stateForSlot = cloneFishingState(slotFishingStates[activeRodSlot]);
+    prepareWaitingState(stateForSlot, x, y);
+    slotFishingStates[activeRodSlot] = stateForSlot;
     render();
     return;
   }
 
-  fishing.floatX = x;
-  fishing.floatY = y;
-  fishing.bobberCut = 0;
-
-  fishing.waitTimer = 2 + Math.random() * 3;
-  fishing.fish = rollFishForLocation(getCurrentLocation());
-  fishing.catchProgress = 0;
-  fishing.fightTimer = 0;
-  fishing.rodOverload = 0;
-  fishing.reelOverload = 0;
-  fishing.rodTension = 0;
-  fishing.reelTension = 0;
-  fishing.currentLoad = 0;
-  fishing.lastPull = null;
-  fishing.fishDistance = 0;
-  fishing.fishStartDistance = 0;
-  fishing.fishVelocity = 0;
-  fishing.fishStamina = 0;
-  fishing.fishStaminaMax = 0;
-  fishing.escapeMeter = 0;
-  fishing.lineWear = 0;
-  fishing.rodWear = 0;
-  fishing.reelWear = 0;
-  fishing.fishPattern = 'struggle';
-  fishing.fishPatternTimer = 0;
-  fishing.rodCriticalHold = 0;
-  fishing.reelCriticalHold = 0;
-
+  prepareWaitingState(fishing, x, y);
   setPhase('waiting');
 }
 
@@ -833,8 +868,7 @@ function bindEvents(): void {
   document.querySelectorAll<HTMLButtonElement>('[data-rod-slot]').forEach((button) => {
     const slot = Number(button.dataset.rodSlot ?? '0');
     button.addEventListener('click', () => {
-      activeRodSlot = Math.max(0, Math.min(2, slot));
-      render();
+      switchActiveRodSlot(slot);
     });
   });
 
@@ -854,7 +888,6 @@ function bindEvents(): void {
   });
 
   document.querySelector<HTMLDivElement>('#water')?.addEventListener('click', (event) => {
-    if (fishing.phase === 'hooked') return;
     const water = event.currentTarget as HTMLDivElement;
     const rect = water.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * 100;
@@ -1155,6 +1188,7 @@ function updateFishing(dt: number): void {
     return;
   }
 
+  persistActiveFishingState();
   renderHudOnly();
 }
 
@@ -1204,9 +1238,9 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'KeyG') gPressed = true;
   if (event.code === 'KeyH') hPressed = true;
 
-  if (event.code === 'Digit1') { activeRodSlot = 0; render(); return; }
-  if (event.code === 'Digit2') { activeRodSlot = 1; render(); return; }
-  if (event.code === 'Digit3') { activeRodSlot = 2; render(); return; }
+  if (event.code === 'Digit1') { switchActiveRodSlot(0); return; }
+  if (event.code === 'Digit2') { switchActiveRodSlot(1); return; }
+  if (event.code === 'Digit3') { switchActiveRodSlot(2); return; }
 
   if (event.code === 'KeyM') {
     screen = screen === 'map' ? 'base' : 'map';
@@ -1241,5 +1275,6 @@ window.addEventListener('keyup', (event) => {
   if (event.code === 'KeyH') hPressed = false;
 });
 
+initSlotFishingStates();
 render();
 if (rafId === 0) rafId = requestAnimationFrame(gameLoop);
