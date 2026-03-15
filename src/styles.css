@@ -57,14 +57,14 @@ body {
   align-items: center;
   background: linear-gradient(180deg, rgba(26, 65, 106, 0.92) 0%, rgba(16, 39, 69, 0.94) 100%);
   border-bottom: 1px solid rgba(150, 220, 255, 0.34);
-  color: #fff;
+  color: #d7ecff;
   min-height: 56px;
 }
 
 .money-box,
 .menu-box {
   background: rgba(10, 22, 41, 0.48);
-  color: #f4f7ff;
+  color: #d4e9ff;
   margin: 8px;
   padding: 10px 16px;
   border: 1px solid rgba(150, 220, 255, 0.28);
@@ -169,7 +169,7 @@ body {
   position: absolute;
   right: 10px;
   bottom: 10px;
-  color: #fff;
+  color: #d7ecff;
   font-size: 24px;
 }
 
@@ -193,7 +193,7 @@ body {
 .base-btn {
   border: 1px solid #2b79b8;
   background: linear-gradient(180deg, #53d4ff 0%, #3b89e9 100%);
-  color: #fff;
+  color: #07233d;
   font-size: 26px;
 }
 
@@ -221,7 +221,7 @@ body {
   margin-top: 8px;
   border: 1px solid #2b79b8;
   background: linear-gradient(180deg, #53d4ff 0%, #3b89e9 100%);
-  color: #fff;
+  color: #07233d;
   font-size: 14px;
   padding: 6px 8px;
   cursor: pointer;
@@ -241,7 +241,7 @@ body {
 
 .map-header {
   background: linear-gradient(180deg, rgba(10, 24, 43, 0.88), rgba(16, 37, 61, 0.9));
-  color: #fff;
+  color: #d7ecff;
   border: 1px solid rgba(162, 220, 255, 0.43);
   font-size: 38px;
   padding: 10px 14px;
@@ -255,7 +255,7 @@ body {
   height: 56px;
   border: 1px solid rgba(181, 224, 255, 0.7);
   background: rgba(11, 21, 37, 0.82);
-  color: #fff;
+  color: #d7ecff;
   font-size: 40px;
 }
 
@@ -346,7 +346,7 @@ body {
   gap: 10px;
   background: rgba(8, 23, 42, 0.74);
   border: 1px solid rgba(148, 217, 255, 0.38);
-  color: #fff;
+  color: #d7ecff;
   padding: 10px;
   border-radius: 14px;
   z-index: 5;
@@ -458,7 +458,7 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #f4f6ff;
+  background: #deefff;
   border: none;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 0 8px rgba(255, 255, 255, 0.45);
   clip-path: none;
@@ -723,7 +723,7 @@ body {
 
 .rod-slot-btn.active {
   background: linear-gradient(180deg, #75e8ff 0%, #3f8cff 100%);
-  color: #fff;
+  color: #08213c;
 }
 
 .utility-modal {
@@ -759,7 +759,7 @@ body {
   top: 0;
   border: 1px solid #5f7994;
   background: #1e3348;
-  color: #fff;
+  color: #d7ecff;
   border-radius: 8px;
   width: 32px;
   height: 32px;
@@ -789,9 +789,14 @@ body {
 
 .shore-rod.active {
   background: linear-gradient(180deg, #95f4ff 0%, #52a3ff 100%);
-  color: #fff;
+  color: #08213c;
 }
 
 .shore-rod.casted {
   box-shadow: 0 0 0 2px rgba(140, 242, 166, 0.8);
+}
+
+
+.hidden {
+  display: none !important;
 }
