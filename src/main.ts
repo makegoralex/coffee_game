@@ -278,6 +278,36 @@ function getInventoryByType(type: ItemType): TackleItem[] {
   return inventory.filter((item) => item.type === type && item.quantity > 0);
 }
 
+function countItemUsage(itemId: string, excludeSlot: number | null = null): number {
+  return rodLoadouts.reduce((count, loadout, slot) => {
+    if (excludeSlot !== null && slot === excludeSlot) return count;
+    const used = (Object.values(loadout) as Array<string | null>).some((id) => id === itemId);
+    return used ? count + 1 : count;
+  }, 0);
+}
+
+function getAvailableItemCount(itemId: string, excludeSlot: number | null = null): number {
+  const item = inventory.find((entry) => entry.id === itemId);
+  if (!item || item.quantity <= 0) return 0;
+  return Math.max(0, item.quantity - countItemUsage(itemId, excludeSlot));
+}
+
+function normalizeLoadoutsByInventory(): void {
+  inventory.forEach((item) => {
+    const slotsUsingItem = rodLoadouts
+      .map((loadout, slot) => ({ loadout, slot }))
+      .filter(({ loadout }) => (Object.values(loadout) as Array<string | null>).some((id) => id === item.id));
+
+    if (slotsUsingItem.length <= item.quantity) return;
+    const overflow = slotsUsingItem.slice(item.quantity);
+    overflow.forEach(({ loadout }) => {
+      (Object.keys(loadout) as ItemType[]).forEach((type) => {
+        if (loadout[type] === item.id) loadout[type] = null;
+      });
+    });
+  });
+}
+
 function getInventoryItem(id: string | null): TackleItem | null {
   if (!id) return null;
   return inventory.find((item) => item.id === id && item.quantity > 0) ?? null;
@@ -390,13 +420,7 @@ function removeOneItem(itemId: string): void {
   if (!found || found.quantity <= 0) return;
   found.quantity -= 1;
 
-  if (found.quantity <= 0) {
-    rodLoadouts.forEach((loadout) => {
-      (Object.keys(loadout) as ItemType[]).forEach((type) => {
-        if (loadout[type] === itemId) loadout[type] = null;
-      });
-    });
-  }
+  normalizeLoadoutsByInventory();
 }
 
 function breakCurrentRig(): void {
@@ -442,7 +466,10 @@ function applyConsumablePurchase(itemId: string): void {
 function applyEquipItem(itemId: string): void {
   const item = inventory.find((entry) => entry.id === itemId && entry.quantity > 0);
   if (!item) return;
-  getActiveLoadout()[item.type] = item.id;
+
+  const activeLoadout = getActiveLoadout();
+  if (activeLoadout[item.type] !== item.id && getAvailableItemCount(item.id, activeRodSlot) <= 0) return;
+  activeLoadout[item.type] = item.id;
   persistActiveFishingState();
   if (!suppressRender) render();
 }
@@ -807,7 +834,12 @@ function renderAssemblyPanel(rigStats: { rodLoad: number; reelLoad: number; fina
                 ${
                   options
                     .map(
-                      (item) => `<button class="equip-btn ${activeLoadout[type] === item.id ? 'active' : ''}" data-equip-id="${item.id}">${item.name} (${item.loadKg}кг) x${item.quantity}</button>`
+                      (item) => {
+                        const freeCount = getAvailableItemCount(item.id, activeRodSlot);
+                        const selected = activeLoadout[type] === item.id;
+                        const canEquip = selected || freeCount > 0;
+                        return `<button class="equip-btn ${selected ? 'active' : ''}" data-equip-id="${item.id}" ${canEquip ? '' : 'disabled'}>${item.name} (${item.loadKg}кг) • свободно ${freeCount}/${item.quantity}</button>`;
+                      }
                     )
                     .join('') || '<div class="no-items">нет предметов</div>'
                 }

@@ -637,6 +637,11 @@ body {
   background: linear-gradient(180deg, #a6f3ff 0%, #70c8ff 100%);
 }
 
+.equip-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .shop-btn:disabled {
   opacity: 0.5;
   cursor: default;
