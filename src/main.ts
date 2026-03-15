@@ -761,10 +761,10 @@ function renderFishingScreen(rigStats: { rodLoad: number; reelLoad: number; fina
         ${rods
           .map((rod) => {
             const state = slotFishingStates[rod.rodSlot] ?? fishing;
-            if (state.phase !== 'waiting' && state.phase !== 'bite' && state.phase !== 'hooked') return '';
+            const visible = state.phase === 'waiting' || state.phase === 'bite' || state.phase === 'hooked';
             const bobberClass = `${state.phase === 'bite' && state.biteType === 'run' ? 'run' : ''} ${state.phase === 'bite' && state.biteType === 'sink' ? 'bite-sink' : ''} ${state.phase === 'hooked' && state.biteType === 'run' ? 'run hooked-run' : ''} ${state.phase === 'hooked' && state.biteType === 'sink' ? 'dot' : ''}`;
             const marker = getFishMarkerPositionFor(rod, state);
-            return `${rod.rodSlot === activeRodSlot ? '<div id="bobber" ' : '<div '}class="float bobber ${bobberClass}" style="left:${state.floatX}%; top:${state.floatY}%; --bobber-cut:${state.bobberCut.toFixed(2)}"></div>${marker ? `${rod.rodSlot === activeRodSlot ? '<div id="fish-marker" ' : '<div '}class="fish-marker" style="left:${marker.x.toFixed(2)}%; top:${marker.y.toFixed(2)}%"></div>` : ''}`;
+            return `<div class="float bobber ${bobberClass} ${visible ? '' : 'hidden'}" data-bobber-slot="${rod.rodSlot}" style="left:${state.floatX}%; top:${state.floatY}%; --bobber-cut:${state.bobberCut.toFixed(2)}"></div><div class="fish-marker ${marker && visible ? '' : 'hidden'}" data-fish-marker-slot="${rod.rodSlot}" style="${marker ? `left:${marker.x.toFixed(2)}%; top:${marker.y.toFixed(2)}%;` : ''}"></div>`;
           })
           .join('')}
       </div>
@@ -1212,28 +1212,44 @@ function updateFishing(dt: number): void {
 function renderHudOnly(): void {
   const rodLoadBar = document.querySelector<HTMLDivElement>('#rod-load-bar');
   const reelLoadBar = document.querySelector<HTMLDivElement>('#reel-load-bar');
-  const bobber = document.querySelector<HTMLDivElement>('#bobber');
-  const fishMarker = document.querySelector<HTMLDivElement>('#fish-marker');
 
   if (rodLoadBar) rodLoadBar.style.width = `${Math.max(0, Math.min(100, fishing.rodTension * 100)).toFixed(0)}%`;
   if (reelLoadBar) reelLoadBar.style.width = `${Math.max(0, Math.min(100, fishing.reelTension * 100)).toFixed(0)}%`;
 
-  if (bobber) {
-    bobber.style.left = `${fishing.floatX}%`;
-    bobber.style.top = `${fishing.floatY}%`;
-    bobber.style.setProperty('--bobber-cut', `${fishing.bobberCut.toFixed(2)}`);
-  }
+  document.querySelectorAll<HTMLDivElement>('[data-bobber-slot]').forEach((bobber) => {
+    const slot = Number(bobber.dataset.bobberSlot);
+    if (!Number.isFinite(slot)) return;
+    const state = slotFishingStates[slot];
+    if (!state) return;
 
-  if (fishMarker) {
-    const markerPosition = getFishMarkerPosition();
-    if (!markerPosition) {
-      fishMarker.style.display = 'none';
-    } else {
-      fishMarker.style.display = 'block';
-      fishMarker.style.left = `${markerPosition.x.toFixed(2)}%`;
-      fishMarker.style.top = `${markerPosition.y.toFixed(2)}%`;
+    const visible = state.phase === 'waiting' || state.phase === 'bite' || state.phase === 'hooked';
+    bobber.classList.toggle('hidden', !visible);
+    bobber.style.left = `${state.floatX}%`;
+    bobber.style.top = `${state.floatY}%`;
+    bobber.style.setProperty('--bobber-cut', `${state.bobberCut.toFixed(2)}`);
+  });
+
+  document.querySelectorAll<HTMLDivElement>('[data-fish-marker-slot]').forEach((fishMarker) => {
+    const slot = Number(fishMarker.dataset.fishMarkerSlot);
+    if (!Number.isFinite(slot)) return;
+    const rod = rods.find((item) => item.rodSlot === slot);
+    const state = slotFishingStates[slot];
+    if (!rod || !state) {
+      fishMarker.classList.add('hidden');
+      return;
     }
-  }
+
+    const visible = state.phase === 'waiting' || state.phase === 'bite' || state.phase === 'hooked';
+    const markerPosition = visible ? getFishMarkerPositionFor(rod, state) : null;
+    if (!markerPosition) {
+      fishMarker.classList.add('hidden');
+      return;
+    }
+
+    fishMarker.classList.remove('hidden');
+    fishMarker.style.left = `${markerPosition.x.toFixed(2)}%`;
+    fishMarker.style.top = `${markerPosition.y.toFixed(2)}%`;
+  });
 }
 
 function gameLoop(ts: number): void {
