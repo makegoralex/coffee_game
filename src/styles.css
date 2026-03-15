@@ -552,6 +552,51 @@ body {
   border-left: 1px solid rgba(128, 203, 255, 0.32);
 }
 
+.notice-list {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.notice-empty {
+  font-size: 12px;
+  color: #456382;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px dashed #9bb9d7;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.notice-item {
+  font-size: 12px;
+  line-height: 1.35;
+  border-radius: 8px;
+  padding: 7px 8px;
+  border: 1px solid #9bb9d7;
+  background: rgba(255, 255, 255, 0.82);
+  color: #193654;
+}
+
+.notice-item--warn {
+  border-color: #e0ae5f;
+  background: #fff3d8;
+  color: #5f3b05;
+}
+
+.notice-item--success {
+  border-color: #72bf96;
+  background: #ddf6e9;
+  color: #154731;
+}
+
+.notice-item--error {
+  border-color: #d78e8e;
+  background: #ffe2e2;
+  color: #611f1f;
+}
+
 .panel-title {
   font-weight: 700;
   margin-bottom: 4px;

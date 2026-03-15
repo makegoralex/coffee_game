@@ -9,6 +9,7 @@ type PullAction = 'rod' | 'reel' | null;
 type UtilityPanel = 'shop' | 'keepnet' | null;
 type BiteType = 'sink' | 'run';
 type FishFightPattern = 'struggle' | 'run' | 'rest' | 'headshake' | 'deeppull';
+type NoticeKind = 'info' | 'warn' | 'success' | 'error';
 
 interface Rod {
   id: number;
@@ -60,6 +61,12 @@ interface ConsumableShopItem {
   foodGain: number;
   alcoholGain: number;
   description: string;
+}
+
+interface PlayerNotice {
+  id: number;
+  text: string;
+  kind: NoticeKind;
 }
 
 interface FishingState {
@@ -219,6 +226,32 @@ let debugVisible = false;
 let audioContext: AudioContext | null = null;
 let suppressRender = false;
 let suppressHudRender = false;
+let noticeId = 0;
+let notices: PlayerNotice[] = [];
+
+function pushNotice(text: string, kind: NoticeKind = 'info', ttlMs = 2600): void {
+  if (notices[0]?.text === text && notices[0]?.kind === kind) return;
+  noticeId += 1;
+  const currentNoticeId = noticeId;
+  notices = [{ id: currentNoticeId, text, kind }, ...notices].slice(0, 5);
+  if (!suppressRender) render();
+
+  window.setTimeout(() => {
+    const before = notices.length;
+    notices = notices.filter((notice) => notice.id !== currentNoticeId);
+    if (before !== notices.length && !suppressRender) render();
+  }, ttlMs);
+}
+
+function renderNotices(): string {
+  if (notices.length === 0) {
+    return '<div class="notice-empty">Подсказки и события будут здесь</div>';
+  }
+
+  return notices
+    .map((notice) => `<div class="notice-item notice-item--${notice.kind}">${notice.text}</div>`)
+    .join('');
+}
 
 function applyViewportScale(): void {
   // full-width layout, no additional scaling required
@@ -322,9 +355,13 @@ function getKeepnetTotalPrice(): number {
 }
 
 function sellKeepnet(): void {
-  if (keepnet.length === 0) return;
+  if (keepnet.length === 0) {
+    pushNotice('Садок пуст — нечего продавать.', 'warn');
+    return;
+  }
   money += getKeepnetTotalPrice();
   keepnet = [];
+  pushNotice('Садок продан. Деньги зачислены.', 'success');
   persistActiveFishingState();
   if (!suppressRender) render();
 }
@@ -411,6 +448,10 @@ function setPhase(phase: FishingPhase, fishData?: CaughtFish): void {
     rods = rods.filter((rod) => rod.rodSlot !== activeRodSlot);
   }
 
+  if (phase === 'landed' && fishData) pushNotice(`Поймано: ${fishData.name} (${fishData.weight.toFixed(2)} кг).`, 'success', 3000);
+  if (phase === 'escaped') pushNotice('Рыба сорвалась с крючка.', 'error');
+  if (phase === 'broken') pushNotice('Снасть не выдержала и сломалась.', 'error');
+
   persistActiveFishingState();
   if (!suppressRender) render();
 }
@@ -438,7 +479,11 @@ function breakRigPart(part: 'rod' | 'reel' | 'line'): void {
 
 function buyItem(itemId: string): void {
   const catalogItem = CATALOG.find((entry) => entry.id === itemId);
-  if (!catalogItem || money < catalogItem.price) return;
+  if (!catalogItem) return;
+  if (money < catalogItem.price) {
+    pushNotice('Недостаточно денег для покупки.', 'warn');
+    return;
+  }
 
   money -= catalogItem.price;
   const existing = inventory.find((item) => item.id === itemId);
@@ -468,8 +513,12 @@ function applyEquipItem(itemId: string): void {
   if (!item) return;
 
   const activeLoadout = getActiveLoadout();
-  if (activeLoadout[item.type] !== item.id && getAvailableItemCount(item.id, activeRodSlot) <= 0) return;
+  if (activeLoadout[item.type] !== item.id && getAvailableItemCount(item.id, activeRodSlot) <= 0) {
+    pushNotice(`Нет свободных "${item.name}". Купите ещё.`, 'warn');
+    return;
+  }
   activeLoadout[item.type] = item.id;
+  pushNotice(`Установлено: ${item.name}.`, 'info', 1800);
   persistActiveFishingState();
   if (!suppressRender) render();
 }
@@ -548,8 +597,14 @@ function prepareWaitingState(target: FishingState, x: number, y: number): void {
 }
 
 function startCasting(x: number, y: number): void {
-  if (!canStartFishing()) return;
-  if (!isRodReady()) return;
+  if (!canStartFishing()) {
+    pushNotice('Вы голодны: поешьте перед рыбалкой.', 'warn');
+    return;
+  }
+  if (!isRodReady()) {
+    pushNotice('Снасть не собрана: проверьте удилище, катушку, леску, крючок и наживку.', 'warn', 3200);
+    return;
+  }
   if (hasRodInSlot(activeRodSlot)) {
     rods = rods.filter((rod) => rod.rodSlot !== activeRodSlot);
     const slotState = cloneFishingState(slotFishingStates[activeRodSlot]);
@@ -557,14 +612,21 @@ function startCasting(x: number, y: number): void {
     slotFishingStates[activeRodSlot] = slotState;
     clearFishingState(fishing);
   }
-  if (rods.length >= 3) return;
+  if (rods.length >= 3) {
+    pushNotice('Уже закинуто максимум 3 удочки.', 'warn');
+    return;
+  }
   const bait = getInventoryItem(getActiveLoadout().bait);
-  if (!bait) return;
+  if (!bait) {
+    pushNotice('На активной снасти закончилась наживка.', 'warn');
+    return;
+  }
 
   removeOneItem(bait.id);
 
   rodId += 1;
   rods.push({ id: rodId, castX: x, castY: y, rodSlot: activeRodSlot });
+  pushNotice(`Удочка ${activeRodSlot + 1} закинута.`, 'info', 1700);
 
   if (fishing.phase !== 'idle') {
     const stateForSlot = cloneFishingState(slotFishingStates[activeRodSlot]);
@@ -735,6 +797,7 @@ function render(): void {
               <button class="utility-btn" id="open-keepnet-btn" title="Садок"><span class="utility-emoji">🧺</span><span>садок</span></button>
               <button class="utility-btn" id="go-base-btn" title="На базу"><span class="utility-emoji">🏕️</span><span>на базу</span></button>
             </div>
+            <div class="notice-list">${renderNotices()}</div>
           </div>
         </div>
       </div>
