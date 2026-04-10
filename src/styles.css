@@ -139,6 +139,7 @@ p {
 
 .unit {
   --hp: 100%;
+  --unit-scale: 1;
   position: absolute;
   bottom: 74px;
   transform: translateX(-50%);
@@ -148,8 +149,46 @@ p {
   gap: 2px;
 }
 
-.unit span {
-  font-size: 28px;
+.model {
+  position: relative;
+  justify-self: center;
+  width: calc(30px * var(--unit-scale));
+  height: calc(40px * var(--unit-scale));
+}
+
+.model i {
+  position: absolute;
+  display: block;
+}
+
+.model .head {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(12px * var(--unit-scale));
+  height: calc(12px * var(--unit-scale));
+  border-radius: 50%;
+  background: #cbd8f3;
+}
+
+.model .body {
+  top: calc(11px * var(--unit-scale));
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(16px * var(--unit-scale));
+  height: calc(18px * var(--unit-scale));
+  border-radius: 8px;
+  background: #6896e8;
+}
+
+.model .weapon {
+  top: calc(14px * var(--unit-scale));
+  left: calc(2px * var(--unit-scale));
+  width: calc(24px * var(--unit-scale));
+  height: calc(4px * var(--unit-scale));
+  border-radius: 6px;
+  background: #c5d8ff;
+  transform-origin: 80% 50%;
 }
 
 .unit small {
@@ -167,6 +206,28 @@ p {
 
 .unit.enemy {
   filter: hue-rotate(145deg);
+}
+
+.unit.ranged .model .weapon {
+  width: calc(30px * var(--unit-scale));
+  height: calc(3px * var(--unit-scale));
+  left: calc(-2px * var(--unit-scale));
+  background: #f1f5ff;
+}
+
+.unit.heavy .model .body {
+  width: calc(22px * var(--unit-scale));
+  height: calc(22px * var(--unit-scale));
+  border-radius: 7px;
+  background: #5072b8;
+}
+
+.unit.heavy .model .weapon {
+  width: calc(18px * var(--unit-scale));
+  height: calc(9px * var(--unit-scale));
+  top: calc(16px * var(--unit-scale));
+  left: calc(6px * var(--unit-scale));
+  background: #9bb1db;
 }
 
 .controls {
@@ -213,6 +274,13 @@ button:disabled {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+}
+
+.unit-btn em {
+  font-style: normal;
+  color: #9fc0f3;
+  font-size: 12px;
+  margin-left: 6px;
 }
 
 .primary {

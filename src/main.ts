@@ -5,13 +5,15 @@ type Side = 'player' | 'enemy';
 interface UnitType {
   key: string;
   name: string;
-  emoji: string;
+  role: 'melee' | 'ranged' | 'heavy';
   health: number;
   damage: number;
   speed: number;
   reward: number;
   cost: number;
   cooldown: number;
+  range: number;
+  scale: number;
 }
 
 interface Unit {
@@ -44,9 +46,9 @@ const ERAS: Era[] = [
     enemyBase: 470,
     enemyIncome: 13,
     units: [
-      { key: 'club', name: 'Дубинщик', emoji: '🪵', health: 80, damage: 13, speed: 25, reward: 13, cost: 30, cooldown: 0.9 },
-      { key: 'spear', name: 'Копейщик', emoji: '🗡️', health: 120, damage: 18, speed: 19, reward: 20, cost: 55, cooldown: 1.2 },
-      { key: 'mammoth', name: 'Мамонт', emoji: '🦣', health: 260, damage: 35, speed: 13, reward: 42, cost: 120, cooldown: 1.8 },
+      { key: 'club', name: 'Дубинщик', role: 'melee', health: 105, damage: 14, speed: 23, reward: 14, cost: 32, cooldown: 0.9, range: 3.1, scale: 1 },
+      { key: 'spear', name: 'Пращник', role: 'ranged', health: 78, damage: 20, speed: 18, reward: 22, cost: 64, cooldown: 1.25, range: 15, scale: 1 },
+      { key: 'mammoth', name: 'Мамонт', role: 'heavy', health: 320, damage: 44, speed: 10, reward: 46, cost: 130, cooldown: 1.95, range: 3.2, scale: 1.2 },
     ],
   },
   {
@@ -58,9 +60,9 @@ const ERAS: Era[] = [
     enemyBase: 660,
     enemyIncome: 18,
     units: [
-      { key: 'sword', name: 'Мечник', emoji: '⚔️', health: 120, damage: 20, speed: 27, reward: 22, cost: 55, cooldown: 0.85 },
-      { key: 'crossbow', name: 'Арбалетчик', emoji: '🏹', health: 95, damage: 28, speed: 20, reward: 30, cost: 90, cooldown: 1.35 },
-      { key: 'knight', name: 'Рыцарь', emoji: '🐎', health: 320, damage: 44, speed: 15, reward: 58, cost: 185, cooldown: 1.95 },
+      { key: 'sword', name: 'Мечник', role: 'melee', health: 140, damage: 21, speed: 25, reward: 24, cost: 60, cooldown: 0.85, range: 3.2, scale: 1 },
+      { key: 'crossbow', name: 'Арбалетчик', role: 'ranged', health: 110, damage: 33, speed: 18, reward: 34, cost: 98, cooldown: 1.3, range: 19, scale: 1 },
+      { key: 'knight', name: 'Рыцарь', role: 'heavy', health: 410, damage: 54, speed: 11, reward: 64, cost: 205, cooldown: 2.1, range: 3.3, scale: 1.2 },
     ],
   },
   {
@@ -72,9 +74,9 @@ const ERAS: Era[] = [
     enemyBase: 920,
     enemyIncome: 24,
     units: [
-      { key: 'rifle', name: 'Стрелок', emoji: '🔫', health: 145, damage: 31, speed: 29, reward: 33, cost: 85, cooldown: 0.75 },
-      { key: 'grenadier', name: 'Гренадёр', emoji: '💣', health: 180, damage: 42, speed: 21, reward: 44, cost: 135, cooldown: 1.2 },
-      { key: 'tank', name: 'Танк', emoji: '🚜', health: 430, damage: 66, speed: 12, reward: 78, cost: 265, cooldown: 2.1 },
+      { key: 'rifle', name: 'Стрелок', role: 'ranged', health: 130, damage: 38, speed: 20, reward: 38, cost: 96, cooldown: 0.95, range: 23, scale: 1 },
+      { key: 'grenadier', name: 'Штурмовик', role: 'melee', health: 210, damage: 34, speed: 22, reward: 48, cost: 140, cooldown: 0.95, range: 3.3, scale: 1.05 },
+      { key: 'tank', name: 'Танк', role: 'heavy', health: 560, damage: 78, speed: 8, reward: 85, cost: 290, cooldown: 2.2, range: 6.5, scale: 1.3 },
     ],
   },
 ];
@@ -125,8 +127,9 @@ appEl.innerHTML = `
       <p id="statusText" class="status">Добро пожаловать в бой.</p>
       <ul class="tips">
         <li>Уничтожай врагов, чтобы получать ресурсы.</li>
+        <li>Стрелки бьют издалека, но плохо держат удар.</li>
         <li>Сдерживай волну и ломай вражескую базу.</li>
-        <li>Переходи в эпоху, чтобы открыть новые юниты.</li>
+        <li>Тяжёлые бойцы сильнее, но заметно медленнее.</li>
       </ul>
     </div>
   </section>
@@ -223,7 +226,7 @@ function updateUnits(dt: number) {
     const baseX = unit.side === 'player' ? ENEMY_BASE_X : PLAYER_BASE_X;
     const distBase = Math.abs(baseX - unit.x);
 
-    if (target && bestDist < 3.1) {
+    if (target && bestDist < unit.type.range) {
       if (unit.cooldownLeft <= 0) {
         target.health -= unit.type.damage;
         unit.cooldownLeft = unit.type.cooldown;
@@ -231,7 +234,7 @@ function updateUnits(dt: number) {
       continue;
     }
 
-    if (distBase < 2.5) {
+    if (distBase < unit.type.range - 0.6) {
       if (unit.cooldownLeft <= 0) {
         if (unit.side === 'player') {
           enemyBaseHp -= unit.type.damage;
@@ -259,11 +262,16 @@ function renderUnits() {
   unitsLayerEl.innerHTML = '';
   for (const u of units) {
     const el = document.createElement('div');
-    el.className = `unit ${u.side}`;
+    el.className = `unit ${u.side} ${u.type.role}`;
     el.style.left = `${u.x}%`;
+    el.style.setProperty('--unit-scale', `${u.type.scale}`);
     const hpPercent = Math.max(0, (u.health / u.type.health) * 100);
     el.innerHTML = `
-      <span>${u.type.emoji}</span>
+      <span class="model">
+        <i class="head"></i>
+        <i class="body"></i>
+        <i class="weapon"></i>
+      </span>
       <small>${u.type.name}</small>
       <b style="--hp:${hpPercent}%"></b>
     `;
@@ -276,7 +284,8 @@ function renderButtons() {
   getEra().units.forEach((u, idx) => {
     const btn = document.createElement('button');
     btn.className = 'unit-btn';
-    btn.innerHTML = `<span>${idx + 1}. ${u.emoji} ${u.name}</span><strong>${u.cost}</strong>`;
+    const roleLabel = u.role === 'ranged' ? 'дальн.' : u.role === 'heavy' ? 'тяж.' : 'ближ.';
+    btn.innerHTML = `<span>${idx + 1}. ${u.name} <em>${roleLabel}</em></span><strong>${u.cost}</strong>`;
     btn.onclick = () => hire(idx);
     unitButtonsEl.appendChild(btn);
   });
